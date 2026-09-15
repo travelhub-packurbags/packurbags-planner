@@ -64,8 +64,13 @@ export default function ScheduleTrip() {
 
   const isSelectingFromRef = useRef(false);
   const isSelectingDestRef = useRef(false);
+  // Prevent autocomplete firing on mount when values are pre-loaded from sessionStorage
+  const fromMountedRef = useRef(false);
+  const destMountedRef = useRef(false);
 
   useEffect(() => {
+    // Skip first run — value may be pre-filled from sessionStorage
+    if (!fromMountedRef.current) { fromMountedRef.current = true; return; }
     if (isSelectingFromRef.current) { isSelectingFromRef.current = false; return; }
     if (!params.fromCity.trim() || params.fromCity.trim().length < 2) {
       setFromSuggestions([]);
@@ -86,6 +91,8 @@ export default function ScheduleTrip() {
   }, [params.fromCity]);
 
   useEffect(() => {
+    // Skip first run — value may be pre-filled from sessionStorage
+    if (!destMountedRef.current) { destMountedRef.current = true; return; }
     if (isSelectingDestRef.current) { isSelectingDestRef.current = false; return; }
     if (!params.locations.trim() || params.locations.trim().length < 2) {
       setDestSuggestions([]);
@@ -670,6 +677,7 @@ export default function ScheduleTrip() {
                   <input
                     type="date"
                     required
+                    min={new Date().toISOString().split('T')[0]}
                     value={params.fromDate}
                     onChange={e => {
                       const newFromDate = e.target.value;
@@ -691,7 +699,7 @@ export default function ScheduleTrip() {
                   <input
                     type="date"
                     required
-                    min={params.fromDate}
+                    min={params.fromDate || new Date().toISOString().split('T')[0]}
                     value={params.toDate}
                     onChange={e => setParams({...params, toDate: e.target.value})}
                     className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-[#121619] outline-none text-sm font-medium"
