@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.planner
+    container_name: trip-planner-backend
+    ports:
+      - "5000:5000"
+    env_file:
+      - backend/.env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./react-app
+      dockerfile: Dockerfile
+    container_name: trip-planner-frontend
+    ports:
+      - "80:80"
+    # To use a different port locally, change "80:80" to "3000:80"
+    restart: unless-stopped
+    depends_on:
+      - backend
