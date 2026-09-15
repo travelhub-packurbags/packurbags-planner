@@ -3,6 +3,10 @@ import { toast } from 'react-toastify';
 let GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
+// Module-level cache for fetchGoogleAttractions.
+// Prevents duplicate API calls from React StrictMode's double-invoke.
+const attractionsCache = new Map();
+
 export async function getGoogleKey() {
   if (GOOGLE_PLACES_KEY) return GOOGLE_PLACES_KEY;
   try {
@@ -572,26 +576,29 @@ export async function searchRestaurants(cityName) {
 /**
  * Search for Top 10 Tourist Attractions in a given city using Google Places API
  */
-export async function fetchGoogleAttractions(cityName) {
-  const key = await getGoogleKey();
-  if (!key) throw new Error("Google Places API Key missing.");
+export function fetchGoogleAttractions(cityName) {
+  // Cache stores the Promise — set BEFORE any await so StrictMode's 2nd call
+  // always gets a cache hit and shares the single in-flight request.
+  if (attractionsCache.has(cityName)) return attractionsCache.get(cityName);
 
-  try {
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+  const p = (async () => {
+    const key = await getGoogleKey();
+    if (!key) return [];
+
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': key,
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.formattedAddress,places.editorialSummary,places.location,places.primaryType'
+        // No places.photos — tourist spot images come from Wikipedia
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.formattedAddress,places.editorialSummary,places.location,places.primaryType',
       },
-      body: JSON.stringify({
-        textQuery: `top tourist attractions in ${cityName}`,
-        languageCode: "en"
-      })
+      body: JSON.stringify({ textQuery: `top tourist attractions in ${cityName}`, languageCode: 'en' }),
     });
 
     if (!res.ok) {
-      throw new Error(`Google Text Search failed: ${res.status}`);
+      console.error(`[fetchGoogleAttractions] HTTP ${res.status} for "${cityName}"`);
+      return [];
     }
 
     const data = await res.json();
@@ -611,10 +618,13 @@ export async function fetchGoogleAttractions(cityName) {
       description: p.editorialSummary?.text || `A beautiful popular tourist attraction located in ${cityName}.`,
       lat: p.location?.latitude,
       lng: p.location?.longitude,
-      source: 'google'
+      image: null,   // fetched separately via Wikipedia
+      source: 'google',
     }));
-  } catch (err) {
-    console.error("fetchGoogleAttractions failed:", err);
-    return [];
-  }
+  })();
+
+  // Store Promise immediately — before any await runs — so duplicate calls share it
+  attractionsCache.set(cityName, p);
+  return p;
 }
+

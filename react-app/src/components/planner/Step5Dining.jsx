@@ -17,7 +17,39 @@ import {
   faLocationDot,
   faWandMagicSparkles
 } from '@fortawesome/free-solid-svg-icons';
-import { fetchFoursquareImage } from '../../services/foursquare';
+import { fetchSerperImage } from '../../services/serper';
+
+/**
+ * Maps a cuisine/food-type string to a pre-tested, always-relevant Unsplash photo URL.
+ * Used as an instant fallback when no specific restaurant photo is available.
+ */
+function getCuisineImage(foodType = '') {
+  const t = foodType.toLowerCase();
+  if (t.includes('coffee') || t.includes('cafe'))
+    return 'https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=600&q=80';
+  if (t.includes('bengali'))
+    return 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=600&q=80';
+  if (t.includes('south indian') || t.includes('south-indian'))
+    return 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&q=80';
+  if (t.includes('mughlai') || t.includes('biryani'))
+    return 'https://images.unsplash.com/photo-1596097635121-14b63b7a0c19?w=600&q=80';
+  if (t.includes('north indian') || t.includes('north-indian') || t.includes('punjabi'))
+    return 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&q=80';
+  if (t.includes('chinese') || t.includes('asian'))
+    return 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&q=80';
+  if (t.includes('seafood') || t.includes('fish'))
+    return 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=600&q=80';
+  if (t.includes('continental') || t.includes('western'))
+    return 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=600&q=80';
+  if (t.includes('pizza') || t.includes('italian'))
+    return 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=600&q=80';
+  if (t.includes('sweet') || t.includes('dessert') || t.includes('mithai'))
+    return 'https://images.unsplash.com/photo-1551024506-0bccd828d307?w=600&q=80';
+  if (t.includes('street') || t.includes('chaat') || t.includes('fast food'))
+    return 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&q=80';
+  // Default: elegant Indian restaurant interior
+  return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80';
+}
 
 export default function Step5Dining({ 
   destination, 
@@ -58,13 +90,31 @@ export default function Step5Dining({
       const finalCity = destString.split(',').pop().trim();
       const googleResults = await searchRestaurants(finalCity);
       if (googleResults && googleResults.length > 0) {
-        setRestaurants(googleResults);
-        toast.success("Loaded Top 10 Restaurants from Google Places!");
-        // Fetch Foursquare images immediately after results load
-        googleResults.forEach(async (rest) => {
-          const img = await fetchFoursquareImage(rest.name, rest.city || finalCity);
-          if (img) setRestaurantImages(prev => ({ ...prev, [`${rest.name}::${rest.city || finalCity}`]: img }));
-        });
+        // Assign cuisine-type images as fallbacks, then immediately fetch real images
+        const withImages = googleResults.map(rest => ({
+          ...rest,
+          image: rest.image || getCuisineImage(rest.food_type || rest.cuisine || ''),
+        }));
+        setRestaurants(withImages);
+        toast.success(`Loaded ${withImages.length} restaurants! Fetching real photos...`);
+
+        // Fetch Serper photos sequentially
+        let loaded = 0;
+        for (const rest of withImages) {
+          const city = rest.city || finalCity;
+          const img = await fetchSerperImage(rest.name, city);
+          if (img) {
+            setRestaurantImages(prev => ({ ...prev, [`${rest.name}::${city}`]: img }));
+            loaded++;
+          }
+          await new Promise(r => setTimeout(r, 100)); // 100ms polite gap
+        }
+        
+        if (loaded > 0) {
+          toast.success(`📸 ${loaded} real restaurant photos loaded!`, {
+            position: 'bottom-right', autoClose: 3000,
+          });
+        }
       } else {
         toast.info("No highly-rated restaurants found via Google. Using dataset.");
       }
@@ -120,15 +170,6 @@ export default function Step5Dining({
     fetchDiningData();
   }, [destination]);
 
-  // Fetch Foursquare images whenever restaurants list changes (dataset load or Google search)
-  useEffect(() => {
-    if (!restaurants || restaurants.length === 0) return;
-    restaurants.forEach(async (rest) => {
-      const city = rest.city || '';
-      const img = await fetchFoursquareImage(rest.name, city);
-      if (img) setRestaurantImages(prev => ({ ...prev, [`${rest.name}::${city}`]: img }));
-    });
-  }, [restaurants]);
 
   // Find cafes near selected tourist spots
   const spotsNames = selectedPlaces.map(p => p.name.toLowerCase());
@@ -222,11 +263,11 @@ export default function Step5Dining({
                     </div>
                   </div>
 
-                  {/* Restaurant Image — uses existing Unsplash URL or Wikipedia fallback */}
-                  {(rest.image || restaurantImages[`${rest.name}::${rest.city || ''}`]) && (
+                  {/* Restaurant Image — Google Places photo preferred, Unsplash fallback */}
+                  {(restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image) && (
                     <div className="mb-3 rounded-xl overflow-hidden h-36 w-full">
                       <img
-                        src={rest.image || restaurantImages[`${rest.name}::${rest.city || ''}`]}
+                        src={restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image}
                         alt={rest.name}
                         className="w-full h-full object-cover"
                         onError={(e) => { e.target.style.display = 'none'; }}

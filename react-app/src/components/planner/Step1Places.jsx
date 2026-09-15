@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faStar, 
@@ -23,7 +24,8 @@ import {
 import { fetchWeather, getPrecautions } from '../../services/weather';
 import { searchPlaces, getPlaceDetails, fetchGoogleAttractions } from '../../services/places';
 import { faSpinner, faLocationDot } from '@fortawesome/free-solid-svg-icons';
-import { fetchFoursquareImage } from '../../services/foursquare';
+import { fetchFoursquareImage } from '../../services/foursquare'; // Google Places — restaurants only (Step5)
+import { fetchWikipediaImage } from '../../services/wikipedia';    // Wikipedia — tourist places
 
 export default function Step1Places({ destination, selectedPlaces, onTogglePlace, onNext, tripType = 'Family Trip' }) {
   const [places, setPlaces] = useState([]);
@@ -38,57 +40,64 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
   const [filterByVibe, setFilterByVibe] = useState(true);
   const [placeImages, setPlaceImages] = useState({});
 
+  // StrictMode guard — prevents the double-invoke from firing loadPlacesAndWeather twice.
+  // Reset when destination changes so a real city change re-fetches correctly.
+  const loadingRef = useRef(false);
+  const lastDestinationRef = useRef(null);
+
   useEffect(() => {
+    // Skip the StrictMode duplicate invocation
+    if (loadingRef.current && lastDestinationRef.current === destination) return;
+    loadingRef.current = true;
+    lastDestinationRef.current = destination;
+
     const loadPlacesAndWeather = async () => {
       setLoading(true);
       try {
         const res = await fetch('/data/tourist_places.json');
         const data = await res.json();
-        
+
         const targetCity = (destination || '').toLowerCase().trim();
         let filtered = data.filter(p => p.city.toLowerCase().includes(targetCity) || targetCity.includes(p.city.toLowerCase()));
-        
+
         if (filtered.length < 3) {
-          const fallback = data.filter(p => p.state.toLowerCase().includes(targetCity) || p.zone.toLowerCase().includes(targetCity) || targetCity.includes(p.state.toLowerCase()) || targetCity.includes(p.zone.toLowerCase()));
+          const fallback = data.filter(p =>
+            p.state.toLowerCase().includes(targetCity) ||
+            p.zone.toLowerCase().includes(targetCity) ||
+            targetCity.includes(p.state.toLowerCase()) ||
+            targetCity.includes(p.zone.toLowerCase())
+          );
           if (fallback.length > 0) {
             filtered = [...filtered, ...fallback];
-            // Remove duplicates based on id
             filtered = Array.from(new Set(filtered.map(a => a.id))).map(id => filtered.find(a => a.id === id));
           }
         }
-        // If still fewer than 5 results, enrich with Google Places API
-        if (filtered.length < 5) {
-          try {
-            const finalCity = (destination || '').split(',').pop().trim();
-            const googlePlaces = await fetchGoogleAttractions(finalCity);
-            if (googlePlaces && googlePlaces.length > 0) {
-              // If we have some local results, merge; otherwise replace
-              if (filtered.length === 0) {
-                filtered = googlePlaces;
-              } else {
-                // Merge local + google, de-dup by name
-                const existingNames = new Set(filtered.map(p => (p.name || '').toLowerCase()));
-                const newFromGoogle = googlePlaces.filter(p => !existingNames.has((p.name || '').toLowerCase()));
-                filtered = [...filtered, ...newFromGoogle];
-              }
-            } else if (filtered.length === 0) {
-              filtered = data.slice(0, 15);
-            }
-          } catch (err) {
-            console.error("Failed to load places from Google:", err);
-            if (filtered.length === 0) filtered = data.slice(0, 15);
+
+        // Call fetchGoogleAttractions to supplement place data when local JSON has < 5 results.
+        // Photos are NOT fetched here — Wikipedia handles them in the useEffect below.
+        const finalCity = (destination || '').split(',').pop().trim();
+        let googlePlaces = [];
+        try {
+          googlePlaces = await fetchGoogleAttractions(finalCity);
+        } catch (err) {
+          console.error("Failed to load places from Google:", err);
+        }
+
+        if (googlePlaces.length > 0 && filtered.length < 5) {
+          if (filtered.length === 0) {
+            filtered = googlePlaces;
+          } else {
+            const existingNames = new Set(filtered.map(p => (p.name || '').toLowerCase()));
+            const newFromGoogle = googlePlaces.filter(p => !existingNames.has((p.name || '').toLowerCase()));
+            filtered = [...filtered, ...newFromGoogle];
           }
+        } else if (filtered.length === 0) {
+          filtered = data.slice(0, 15);
         }
 
         setPlaces(filtered);
 
-        // Fetch Foursquare images in background
-        filtered.forEach(async (place) => {
-          const img = await fetchFoursquareImage(place.name, place.city);
-          if (img) setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: img }));
-        });
-
-        // 2. Fetch live XWeather data for each unique city represented in the hubs
+        // Fetch live XWeather data for each unique city represented in the hubs
         const uniqueCities = Array.from(new Set(filtered.map(p => p.city).filter(Boolean)));
         const wMap = {};
         await Promise.all(
@@ -109,9 +118,53 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
       }
     };
     loadPlacesAndWeather();
+    // Reset guard on cleanup so a real destination change re-fetches
+    return () => { loadingRef.current = false; };
   }, [destination]);
 
+  // ─── Wikipedia photo loader ───────────────────────────────────────────────
+  // Runs after places are set. Fetches Wikipedia thumbnail for each place
+  // that doesn't already have an image. Wikipedia is free, no auth, 200 req/s
+  // limit — completely immune to 429. Uses ctrl-cancel for StrictMode safety.
+  useEffect(() => {
+    if (!places || places.length === 0) return;
+    const ctrl = { cancelled: false };
+
+    (async () => {
+      // 50ms pause — StrictMode cleanup fires during this window, cancelling
+      // the first run before any request is sent.
+      await new Promise(r => setTimeout(r, 50));
+      if (ctrl.cancelled) return;
+
+      let loaded = 0;
+      for (const place of places) {
+        if (ctrl.cancelled) break;
+        if (place.image) continue; // already has image
+        const img = await fetchWikipediaImage(place.name, place.city);
+        if (ctrl.cancelled) break;
+        if (img) {
+          setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: img }));
+          loaded++;
+        }
+        // 100ms gap — Wikipedia is very generous but let's be polite
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      if (!ctrl.cancelled && loaded > 0) {
+        toast.success(
+          `📸 ${loaded} tourist spot photo${loaded > 1 ? 's' : ''} loaded via Wikipedia!`,
+          { position: 'bottom-right', autoClose: 3000 }
+        );
+      }
+    })();
+
+    return () => { ctrl.cancelled = true; };
+  }, [places]);
+
+
   // Live Google Places Search Autocomplete
+
+
   useEffect(() => {
     if (!searchQuery || searchQuery.trim().length < 2) {
       setGoogleSuggestions([]);
@@ -160,10 +213,14 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         onTogglePlace(newPlaceObj);
         setSearchQuery('');
 
-        // Fetch Wikipedia image for the newly added place
-        const wikiImg = await fetchFoursquareImage(placeName, placeCity);
+        // Fetch Wikipedia photo for the newly searched/selected spot
+        const wikiImg = await fetchWikipediaImage(placeName, placeCity);
         if (wikiImg) {
           setPlaceImages(prev => ({ ...prev, [`${placeName}::${placeCity}`]: wikiImg }));
+          toast.success(`📸 Photo loaded for "${placeName}" via Wikipedia!`, {
+            position: 'bottom-right',
+            autoClose: 2500,
+          });
         }
       }
     } catch (e) {
