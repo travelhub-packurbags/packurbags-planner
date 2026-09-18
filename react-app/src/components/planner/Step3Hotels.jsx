@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFilter, faStar, faSearch, faArrowRight, faArrowLeft, faHotel, faXmark,
@@ -81,7 +81,7 @@ function HotelCard({ hotel, isSelected, onSelect, stayOrder, onRemove, onUpdateC
           <p className="text-[11px] text-gray-500 mb-2 line-clamp-1">&#x1F4CD; {hotel.address || hotel.city}</p>
           {hotel.routeCity && (
             <span className="inline-block text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full mb-2">
-              📍 {hotel.routeCity}
+              ðŸ“ {hotel.routeCity}
             </span>
           )}
           <div className="flex flex-wrap gap-1.5 mb-2">
@@ -162,7 +162,7 @@ export default function Step3Hotels({ destination, fromDate, toDate, totalDays =
       'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&w=800&q=80',
     ];
     try {
-      const localRes = await fetch('/data/hotels.json');
+      const localRes = await fetch(`${import.meta.env.BASE_URL}data/hotels.json`);
       const localData = await localRes.json();
       let initHotels = [];
       cityList.forEach(city => {
@@ -227,7 +227,7 @@ export default function Step3Hotels({ destination, fromDate, toDate, totalDays =
 
     // --- 2. Fallback: local dataset filtered for all route cities ---
     try {
-      const res = await fetch('/data/hotels.json');
+      const res = await fetch(`${import.meta.env.BASE_URL}data/hotels.json`);
       const data = await res.json();
       let merged = [];
       cityList.forEach(city => {
@@ -327,7 +327,7 @@ export default function Step3Hotels({ destination, fromDate, toDate, totalDays =
             </div>
             <div className="space-y-5">
 
-              {/* City Tabs — only shown for multi-city routes */}
+              {/* City Tabs â€” only shown for multi-city routes */}
               {cityList.length > 1 && (
                 <div>
                   <label className="block text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-2">&#x1F5FA;&#xFE0F; Route City</label>

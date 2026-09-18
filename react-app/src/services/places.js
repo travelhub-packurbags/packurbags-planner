@@ -1,4 +1,4 @@
-import { toast } from 'react-toastify';
+﻿import { toast } from 'react-toastify';
 
 let GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -31,9 +31,9 @@ async function loadLocalDataset() {
   if (cachedLocalData) return cachedLocalData;
   try {
     const [placesRes, locationsRes, hotelsRes] = await Promise.all([
-      fetch('/data/tourist_places.json').then(r => r.json()).catch(() => []),
-      fetch('/data/locations.json').then(r => r.json()).catch(() => []),
-      fetch('/data/hotels.json').then(r => r.json()).catch(() => [])
+      fetch(`${import.meta.env.BASE_URL}data/tourist_places.json`).then(r => r.json()).catch(() => []),
+      fetch(`${import.meta.env.BASE_URL}data/locations.json`).then(r => r.json()).catch(() => []),
+      fetch(`${import.meta.env.BASE_URL}data/hotels.json`).then(r => r.json()).catch(() => [])
     ]);
 
     cachedLocalData = {
@@ -544,7 +544,7 @@ export async function searchRestaurants(cityName) {
     return elements.map((e, i) => {
       const tags = e.tags;
       const cuisine = tags.cuisine ? tags.cuisine.replace(/_/g, ' ') : 'Multi-cuisine';
-      const rating = parseFloat((3.8 + Math.random() * 1.2).toFixed(1)); // 3.8 – 5.0
+      const rating = parseFloat((3.8 + Math.random() * 1.2).toFixed(1)); // 3.8 â€“ 5.0
       let price = 500;
       if (tags['price:range'] === '$') price = 300;
       else if (tags['price:range'] === '$$') price = 800;
@@ -577,7 +577,7 @@ export async function searchRestaurants(cityName) {
  * Search for Top 10 Tourist Attractions in a given city using Google Places API
  */
 export function fetchGoogleAttractions(cityName) {
-  // Cache stores the Promise — set BEFORE any await so StrictMode's 2nd call
+  // Cache stores the Promise â€” set BEFORE any await so StrictMode's 2nd call
   // always gets a cache hit and shares the single in-flight request.
   if (attractionsCache.has(cityName)) return attractionsCache.get(cityName);
 
@@ -590,7 +590,7 @@ export function fetchGoogleAttractions(cityName) {
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': key,
-        // No places.photos — tourist spot images come from Wikipedia
+        // No places.photos â€” tourist spot images come from Wikipedia
         'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.formattedAddress,places.editorialSummary,places.location,places.primaryType',
       },
       body: JSON.stringify({ textQuery: `top tourist attractions in ${cityName}`, languageCode: 'en' }),
@@ -623,7 +623,7 @@ export function fetchGoogleAttractions(cityName) {
     }));
   })();
 
-  // Store Promise immediately — before any await runs — so duplicate calls share it
+  // Store Promise immediately â€” before any await runs â€” so duplicate calls share it
   attractionsCache.set(cityName, p);
   return p;
 }

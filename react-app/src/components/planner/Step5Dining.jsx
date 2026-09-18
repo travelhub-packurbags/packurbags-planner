@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { searchRestaurants } from '../../services/places';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -111,7 +111,7 @@ export default function Step5Dining({
         }
         
         if (loaded > 0) {
-          toast.success(`📸 ${loaded} real restaurant photos loaded!`, {
+          toast.success(`ðŸ“¸ ${loaded} real restaurant photos loaded!`, {
             position: 'bottom-right', autoClose: 3000,
           });
         }
@@ -135,7 +135,7 @@ export default function Step5Dining({
         const targetCity = (destination || '').toLowerCase().trim();
 
         // 1. Fetch Cafes
-        const cafeRes = await fetch('/data/cafes.json');
+        const cafeRes = await fetch(`${import.meta.env.BASE_URL}data/cafes.json`);
         const cafeData = await cafeRes.json();
         let filteredCafes = Array.isArray(cafeData) ? cafeData.filter(c => {
           const cty = (c.city || '').toLowerCase();
@@ -148,7 +148,7 @@ export default function Step5Dining({
         setCafes(filteredCafes);
 
         // 2. Fetch Restaurants
-        const restRes = await fetch('/data/restaurants.json');
+        const restRes = await fetch(`${import.meta.env.BASE_URL}data/restaurants.json`);
         const restData = await restRes.json();
         let filteredRests = Array.isArray(restData) ? restData.filter(r => {
           const cty = (r.city || '').toLowerCase();
@@ -263,7 +263,7 @@ export default function Step5Dining({
                     </div>
                   </div>
 
-                  {/* Restaurant Image — Google Places photo preferred, Unsplash fallback */}
+                  {/* Restaurant Image â€” Google Places photo preferred, Unsplash fallback */}
                   {(restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image) && (
                     <div className="mb-3 rounded-xl overflow-hidden h-36 w-full">
                       <img
@@ -275,12 +275,12 @@ export default function Step5Dining({
                     </div>
                   )}
                   <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">{rest.name}</h3>
-                  <p className="text-xs text-gray-500 mb-2">📍 {rest.area}, {rest.city}</p>
+                  <p className="text-xs text-gray-500 mb-2">ðŸ“ {rest.area}, {rest.city}</p>
                   <p className="text-xs text-gray-600 line-clamp-1 mb-3"><strong>Food Type:</strong> {rest.food_type}</p>
 
                   <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 mb-4 flex justify-between items-center text-xs">
                     <span className="text-gray-500 font-medium">Price for two:</span>
-                    <span className="font-extrabold text-gray-900">₹{rest.price.toLocaleString()}</span>
+                    <span className="font-extrabold text-gray-900">â‚¹{rest.price.toLocaleString()}</span>
                   </div>
                 </div>
 

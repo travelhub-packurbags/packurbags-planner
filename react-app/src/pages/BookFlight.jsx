@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FlightCard from '../components/flight/FlightCard';
 import FlightFilters from '../components/flight/FlightFilters';
@@ -18,7 +18,7 @@ export default function BookFlight() {
   const [showAirline, setShowAirline] = useState(false);
 
   useEffect(() => {
-    fetch('/data/flights_demo.json')
+    fetch(`${import.meta.env.BASE_URL}data/flights_demo.json`)
       .then(res => res.json())
       .then(data => setAllRoutes(data || []))
       .catch(err => console.error("Error loading flights:", err));

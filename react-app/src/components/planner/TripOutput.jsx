@@ -7,6 +7,8 @@ import { redraftTripPlan } from '../../services/gemini';
 import useAppStore from '../../stores/useAppStore';
 import TripPDFDocument from './TripPDFDocument';
 import ItineraryRouteMap from './ItineraryRouteMap';
+import html2pdf from 'html2pdf.js';
+
 
 export default function TripOutput({ plan, setPlan, params = null, selectedHotel = null }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -38,9 +40,45 @@ export default function TripOutput({ plan, setPlan, params = null, selectedHotel
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    const el = printRef.current;
+    if (!el) { window.print(); return; }
+
+    try {
+      // Temporarily force desktop width so mobile/tablet gets a clean A4 PDF
+      const originalStyle = el.style.cssText;
+      el.style.width = '960px';
+      el.style.maxWidth = '960px';
+
+      const opt = {
+        margin:       [8, 8, 8, 8], // mm: top/right/bottom/left
+        filename:     'trip-itinerary.pdf',
+        image:        { type: 'jpeg', quality: 0.97 },
+        html2canvas:  {
+          scale: 2,           // 2x for crisp text on all screens
+          useCORS: true,
+          logging: false,
+          width: 960,
+          windowWidth: 960,
+        },
+        jsPDF: {
+          unit: 'mm',
+          format: 'a4',
+          orientation: 'portrait',
+        },
+        pagebreak: { mode: ['avoid-all', 'css'] },
+      };
+
+      await html2pdf().set(opt).from(el).save();
+
+      // Restore original styles
+      el.style.cssText = originalStyle;
+    } catch (err) {
+      console.error('PDF generation failed, falling back to print:', err);
+      window.print();
+    }
   };
+
 
   const handleProceedToBooking = () => {
     const locList = (params?.locations || plan?.destinations || ['Destination'])

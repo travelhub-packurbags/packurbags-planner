@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faBolt, faTimes, faMapMarkerAlt } from '@fortawesome/free-solid-svg-icons';
@@ -8,7 +8,7 @@ export default function Packages() {
   const [selectedPkg, setSelectedPkg] = useState(null);
 
   useEffect(() => {
-    fetch('/data/packages.json')
+    fetch(`${import.meta.env.BASE_URL}data/packages.json`)
       .then(res => res.json())
       .then(data => setPackages(Array.isArray(data) ? data.slice(0, 4) : []))
       .catch(err => console.error("Error loading packages:", err));
@@ -61,7 +61,7 @@ export default function Packages() {
               <div className="absolute bottom-0 left-0 w-full p-6 text-white transform transition-transform duration-500 translate-y-8 group-hover:translate-y-0">
                 <h3 className="text-2xl font-bold mb-1">{pkg.name}</h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-[#D4B15A]">₹{pkg.price_inr.toLocaleString()}</span>
+                  <span className="text-3xl font-bold text-[#D4B15A]">â‚¹{pkg.price_inr.toLocaleString()}</span>
                   <span className="text-white/70 text-sm"> /person</span>
                 </div>
                 
@@ -118,7 +118,7 @@ export default function Packages() {
                   <h2 className="text-3xl font-bold font-display mb-1">{selectedPkg.name}</h2>
                   <div className="flex items-center gap-4 text-sm font-medium">
                     <span className="flex items-center gap-1.5"><FontAwesomeIcon icon={faMapMarkerAlt} className="text-[#D4B15A]" /> {selectedPkg.days} Days / {selectedPkg.nights} Nights</span>
-                    <span className="text-[#D4B15A] font-bold text-lg">₹{selectedPkg.price_inr.toLocaleString()}</span>
+                    <span className="text-[#D4B15A] font-bold text-lg">â‚¹{selectedPkg.price_inr.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -137,7 +137,7 @@ export default function Packages() {
                         <ul className="space-y-2">
                           {day.activities.map((activity, aIdx) => (
                             <li key={aIdx} className="text-gray-600 text-sm flex gap-2">
-                              <span className="text-[#D4B15A] mt-0.5">•</span>
+                              <span className="text-[#D4B15A] mt-0.5">â€¢</span>
                               <span>{activity}</span>
                             </li>
                           ))}

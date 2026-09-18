@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VendorCard from '../components/bus/VendorCard';
 import BusFilters from '../components/bus/BusFilters';
@@ -17,7 +17,7 @@ export default function BookBus() {
   const [showDriver, setShowDriver] = useState(false);
 
   useEffect(() => {
-    fetch('/data/vendors.json')
+    fetch(`${import.meta.env.BASE_URL}data/vendors.json`)
       .then(res => res.json())
       .then(data => setAllVendors(data || []))
       .catch(err => console.error("Error loading vendors:", err));

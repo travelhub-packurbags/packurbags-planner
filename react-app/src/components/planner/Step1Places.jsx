@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -24,8 +24,9 @@ import {
 import { fetchWeather, getPrecautions } from '../../services/weather';
 import { searchPlaces, getPlaceDetails, fetchGoogleAttractions } from '../../services/places';
 import { faSpinner, faLocationDot } from '@fortawesome/free-solid-svg-icons';
-import { fetchFoursquareImage } from '../../services/foursquare'; // Google Places — restaurants only (Step5)
-import { fetchWikipediaImage } from '../../services/wikipedia';    // Wikipedia — tourist places
+import { fetchFoursquareImage } from '../../services/foursquare'; // Google Places â€” restaurants only (Step5)
+import { fetchWikipediaImage } from '../../services/wikipedia';    // Wikipedia â€” tourist places
+import { geocodeCityORS, fetchORSTouristPlaces, fetchNearestCityORS } from '../../services/orsPlaces'; // ORS fallback
 
 export default function Step1Places({ destination, selectedPlaces, onTogglePlace, onNext, tripType = 'Family Trip' }) {
   const [places, setPlaces] = useState([]);
@@ -40,7 +41,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
   const [filterByVibe, setFilterByVibe] = useState(true);
   const [placeImages, setPlaceImages] = useState({});
 
-  // StrictMode guard — prevents the double-invoke from firing loadPlacesAndWeather twice.
+  // StrictMode guard â€” prevents the double-invoke from firing loadPlacesAndWeather twice.
   // Reset when destination changes so a real city change re-fetches correctly.
   const loadingRef = useRef(false);
   const lastDestinationRef = useRef(null);
@@ -54,7 +55,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
     const loadPlacesAndWeather = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/data/tourist_places.json');
+        const res = await fetch(`${import.meta.env.BASE_URL}data/tourist_places.json`);
         const data = await res.json();
 
         const targetCity = (destination || '').toLowerCase().trim();
@@ -74,7 +75,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         }
 
         // Call fetchGoogleAttractions to supplement place data when local JSON has < 5 results.
-        // Photos are NOT fetched here — Wikipedia handles them in the useEffect below.
+        // Photos are NOT fetched here â€” Wikipedia handles them in the useEffect below.
         const finalCity = (destination || '').split(',').pop().trim();
         let googlePlaces = [];
         try {
@@ -91,9 +92,47 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
             const newFromGoogle = googlePlaces.filter(p => !existingNames.has((p.name || '').toLowerCase()));
             filtered = [...filtered, ...newFromGoogle];
           }
-        } else if (filtered.length === 0) {
-          filtered = data.slice(0, 15);
         }
+
+        // â”€â”€ ORS POI Fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // Only runs when local dataset + Google both returned nothing.
+        // Hard cap: max 2 places. Two ORS calls max (geocode + POI, or +reverse).
+        // Any failure is silent â€” falls through to empty state.
+        if (filtered.length === 0) {
+          try {
+            const coords = await geocodeCityORS(finalCity);
+            if (coords) {
+              // Attempt 1: 5km radius
+              let orsPlaces = await fetchORSTouristPlaces(coords.lat, coords.lng, 2, 5000);
+
+              // Attempt 2: widen to 20km if nothing found (small towns like Pilkhuwa)
+              if (orsPlaces.length === 0) {
+                orsPlaces = await fetchORSTouristPlaces(coords.lat, coords.lng, 2, 20000);
+              }
+
+              // Attempt 3: reverse-geocode to nearest city, fetch that city's POIs
+              if (orsPlaces.length === 0) {
+                const nearest = await fetchNearestCityORS(coords.lat, coords.lng);
+                if (nearest) {
+                  orsPlaces = await fetchORSTouristPlaces(nearest.lat, nearest.lng, 2, 5000);
+                  // Label so the user knows these aren't from their exact destination
+                  orsPlaces = orsPlaces.map(p => ({
+                    ...p,
+                    city: nearest.cityName,
+                    nearbyNote: `Near ${nearest.cityName}`,
+                  }));
+                }
+              }
+
+              filtered = orsPlaces.slice(0, 2);
+            }
+          } catch (orsErr) {
+            console.warn('[ORS Fallback] Skipped:', orsErr.message);
+            // filtered stays [] â†’ empty state UI renders below
+          }
+        }
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 
         setPlaces(filtered);
 
@@ -122,16 +161,16 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
     return () => { loadingRef.current = false; };
   }, [destination]);
 
-  // ─── Wikipedia photo loader ───────────────────────────────────────────────
+  // â”€â”€â”€ Wikipedia photo loader â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Runs after places are set. Fetches Wikipedia thumbnail for each place
   // that doesn't already have an image. Wikipedia is free, no auth, 200 req/s
-  // limit — completely immune to 429. Uses ctrl-cancel for StrictMode safety.
+  // limit â€” completely immune to 429. Uses ctrl-cancel for StrictMode safety.
   useEffect(() => {
     if (!places || places.length === 0) return;
     const ctrl = { cancelled: false };
 
     (async () => {
-      // 50ms pause — StrictMode cleanup fires during this window, cancelling
+      // 50ms pause â€” StrictMode cleanup fires during this window, cancelling
       // the first run before any request is sent.
       await new Promise(r => setTimeout(r, 50));
       if (ctrl.cancelled) return;
@@ -146,13 +185,13 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
           setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: img }));
           loaded++;
         }
-        // 100ms gap — Wikipedia is very generous but let's be polite
+        // 100ms gap â€” Wikipedia is very generous but let's be polite
         await new Promise(r => setTimeout(r, 100));
       }
 
       if (!ctrl.cancelled && loaded > 0) {
         toast.success(
-          `📸 ${loaded} tourist spot photo${loaded > 1 ? 's' : ''} loaded via Wikipedia!`,
+          `ðŸ“¸ ${loaded} tourist spot photo${loaded > 1 ? 's' : ''} loaded via Wikipedia!`,
           { position: 'bottom-right', autoClose: 3000 }
         );
       }
@@ -217,7 +256,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         const wikiImg = await fetchWikipediaImage(placeName, placeCity);
         if (wikiImg) {
           setPlaceImages(prev => ({ ...prev, [`${placeName}::${placeCity}`]: wikiImg }));
-          toast.success(`📸 Photo loaded for "${placeName}" via Wikipedia!`, {
+          toast.success(`ðŸ“¸ Photo loaded for "${placeName}" via Wikipedia!`, {
             position: 'bottom-right',
             autoClose: 2500,
           });
@@ -363,7 +402,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
       {/* Trip Vibe Curator Banner */}
       <div className="mb-6 bg-amber-500/10 border border-[#D4B15A]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-base">✨</span>
+          <span className="text-base">âœ¨</span>
           <div>
             <span className="font-extrabold text-[#D4B15A] uppercase tracking-wider block">
               Curated for {tripType}
@@ -387,6 +426,18 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         <div className="flex justify-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4B15A]"></div>
         </div>
+      ) : displayedPlaces.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+          <div className="text-5xl mb-4">ðŸ—ºï¸</div>
+          <h3 className="text-xl font-bold text-gray-700 mb-2">No Tourist Hotspots Found</h3>
+          <p className="text-gray-500 text-sm max-w-md">
+            We don't have curated tourist spots for <strong>{destination}</strong> in our dataset yet.
+            You can still use the <strong>Search bar above</strong> to find and add specific attractions manually.
+          </p>
+          <p className="text-xs text-gray-400 mt-3">
+            You can skip this step and proceed directly by clicking <strong>"Schedule (0)"</strong> â†’ the AI will still plan your trip.
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {displayedPlaces.map(place => {
@@ -402,7 +453,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                 }`}
               >
                 <div>
-                  {/* Place Image — Google photo (for searched places) or Wikipedia fallback */}
+                  {/* Place Image â€” Google photo (for searched places) or Wikipedia fallback */}
                   {(place.image || placeImages[`${place.name}::${place.city}`]) && (
                     <div className="mb-3 rounded-xl overflow-hidden h-40 w-full">
                       <img
@@ -415,9 +466,16 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                   )}
                   {/* Category & Badge */}
                   <div className="flex justify-between items-start gap-2 mb-3">
-                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A] bg-[#D4B15A]/10 px-2.5 py-1 rounded-md">
-                      {place.type || 'Attraction'}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A] bg-[#D4B15A]/10 px-2.5 py-1 rounded-md">
+                        {place.type || 'Attraction'}
+                      </span>
+                      {place.nearbyNote && (
+                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md">
+                          ðŸ“ {place.nearbyNote}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded-lg text-xs">
                       {renderStars(place.google_review_rating)}
                       <span className="font-bold text-gray-700 ml-1">{place.google_review_rating}</span>
@@ -432,10 +490,10 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                     {place.name}
                   </h3>
                   <div className="flex items-center justify-between text-xs text-gray-400 font-medium mb-3">
-                    <span>📍 {place.city}, {place.state}</span>
+                    <span>ðŸ“ {place.city}, {place.state}</span>
                     {hubWeather && (
                       <span className="bg-amber-500/10 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
-                        🌤️ {hubWeather.maxTemp}°C • Rain: {hubWeather.maxRain}%
+                        ðŸŒ¤ï¸ {hubWeather.maxTemp}Â°C â€¢ Rain: {hubWeather.maxRain}%
                       </span>
                     )}
                   </div>
@@ -489,7 +547,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
             {/* Modal Header */}
             <div className="bg-[#121619] text-white p-6 relative">
               <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#D4B15A] bg-white/10 px-2.5 py-1 rounded-md mb-2 inline-block">
-                {activeModalPlace.type} • {activeModalPlace.city}
+                {activeModalPlace.type} â€¢ {activeModalPlace.city}
               </span>
               <h3 className="text-2xl font-bold text-white font-display">
                 {activeModalPlace.name}
@@ -522,17 +580,17 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                         </div>
                         <div>
                           <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A]">
-                            XWeather Live Update • {activeModalPlace.name}
+                            XWeather Live Update â€¢ {activeModalPlace.name}
                           </span>
                           <h4 className="font-bold text-white text-sm">
-                            📍 {activeModalPlace.city} Weather Conditions
+                            ðŸ“ {activeModalPlace.city} Weather Conditions
                           </h4>
                         </div>
                       </div>
                       {daySummary && (
                         <div className="text-right">
                           <span className="text-base font-extrabold text-[#D4B15A] block">
-                            {daySummary.maxTemp}°C / {daySummary.minTemp}°C
+                            {daySummary.maxTemp}Â°C / {daySummary.minTemp}Â°C
                           </span>
                           <span className="text-[10px] text-gray-400 font-semibold uppercase">{daySummary.mainWeather}</span>
                         </div>
@@ -586,7 +644,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                     <FontAwesomeIcon icon={faMoneyBillWave} className="text-[#D4B15A]" /> Entrance Fee
                   </p>
                   <p className="font-bold text-gray-800 text-sm mt-0.5">
-                    {activeModalPlace.entrance_fee_inr > 0 ? `₹${activeModalPlace.entrance_fee_inr}` : 'Free Entry'}
+                    {activeModalPlace.entrance_fee_inr > 0 ? `â‚¹${activeModalPlace.entrance_fee_inr}` : 'Free Entry'}
                   </p>
                 </div>
 

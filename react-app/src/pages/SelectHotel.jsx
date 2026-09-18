@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faStar } from '@fortawesome/free-solid-svg-icons';
@@ -28,7 +28,7 @@ export default function SelectHotel() {
     const fetchHotels = async () => {
       setLoading(true);
       try {
-        const res = await fetch('/data/hotels.json');
+        const res = await fetch(`${import.meta.env.BASE_URL}data/hotels.json`);
         const data = await res.json();
         
         // Filter by destination city
@@ -79,7 +79,7 @@ export default function SelectHotel() {
         <div className="space-y-8">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-4">
-              Max Price: ₹{priceRange.toLocaleString()} / night
+              Max Price: â‚¹{priceRange.toLocaleString()} / night
             </label>
             <input 
               type="range" 

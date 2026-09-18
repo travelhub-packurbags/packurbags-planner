@@ -1,4 +1,4 @@
-import { checkRateLimit, RATE_LIMITS } from '../utils/rateLimit';
+﻿import { checkRateLimit, RATE_LIMITS } from '../utils/rateLimit';
 import { SYSTEM_PROMPT } from './systemPrompt';
 import { fetchWeather, getPrecautions } from './weather';
 /**
@@ -49,7 +49,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
  * Core Gemini call.
  * 
  * PRODUCTION PATH: Calls /api/planner/generate on the backend (backend-core).
- *   The Gemini key is stored in PLANNER_GEMINI_API_KEY on the server — it never
+ *   The Gemini key is stored in PLANNER_GEMINI_API_KEY on the server â€” it never
  *   appears in the browser bundle.
  * 
  * LOCAL DEV FALLBACK: If the backend proxy returns a 503 (key not configured),
@@ -62,7 +62,7 @@ async function callGemini(userMessage, systemInstruction = null, requireDays = f
     throw new Error(`Rate limited. Try again in ${Math.ceil(retryAfterMs / 1000)}s`);
   }
 
-  // --- 1. Try backend proxy (production path — key stays server-side) ---
+  // --- 1. Try backend proxy (production path â€” key stays server-side) ---
   try {
     const proxyRes = await fetch(`${BACKEND_URL}/api/planner/generate`, {
       method: 'POST',
@@ -79,20 +79,20 @@ async function callGemini(userMessage, systemInstruction = null, requireDays = f
             const testObj = extractJSON(data.text);
             const daysArr = testObj.days || testObj.itinerary || [];
             if (Array.isArray(daysArr) && daysArr.length > 0) return data.text;
-            // Days empty — fall through to direct call below
+            // Days empty â€” fall through to direct call below
           } catch {
-            // parse failed — fall through
+            // parse failed â€” fall through
           }
         } else {
           return data.text;
         }
       }
     } else if (proxyRes.status !== 503) {
-      // 503 means key not set on server — expected for local dev, fall through silently
-      console.warn(`[callGemini] Backend proxy returned ${proxyRes.status} — falling back to direct call`);
+      // 503 means key not set on server â€” expected for local dev, fall through silently
+      console.warn(`[callGemini] Backend proxy returned ${proxyRes.status} â€” falling back to direct call`);
     }
   } catch (proxyErr) {
-    // Network error (backend not running) — fall through to direct call for local dev
+    // Network error (backend not running) â€” fall through to direct call for local dev
     console.warn('[callGemini] Backend proxy unreachable, trying direct call:', proxyErr.message);
   }
 
@@ -221,7 +221,7 @@ function extractJSON(text) {
     .replace(/```\s*$/i, '')
     .trim();
 
-  // Sometimes Gemini prepends a sentence — find the first { or [
+  // Sometimes Gemini prepends a sentence â€” find the first { or [
   const firstBrace = cleaned.indexOf('{');
   const firstBracket = cleaned.indexOf('[');
   if (firstBrace === -1 && firstBracket === -1) {
@@ -343,9 +343,9 @@ async function generateFallbackTripPlan(config) {
 
   try {
     const [tpRes, hRes, rRes] = await Promise.all([
-      fetch('/data/tourist_places.json').then(r => r.json()).catch(() => []),
-      fetch('/data/hotels.json').then(r => r.json()).catch(() => []),
-      fetch('/data/swiggy.json').then(r => r.json()).catch(() => [])
+      fetch(`${import.meta.env.BASE_URL}data/tourist_places.json`).then(r => r.json()).catch(() => []),
+      fetch(`${import.meta.env.BASE_URL}data/hotels.json`).then(r => r.json()).catch(() => []),
+      fetch(`${import.meta.env.BASE_URL}data/swiggy.json`).then(r => r.json()).catch(() => [])
     ]);
 
     spots = tpRes.filter(p => (p.city || '').toLowerCase().includes(destKey) || destKey.includes((p.city || '').toLowerCase()));
@@ -751,7 +751,7 @@ export async function generateTripPlan(config) {
     const totalTripDays = Math.max(1, Math.ceil((endD - startD) / 86400000) + 1);
     const minimumDaysNeeded = (travelDays * 2) + 1;
     const tripTooShort = totalTripDays < minimumDaysNeeded;
-    userMessage += `\n\n- ROAD_TRIP_ENFORCEMENT:\nMAXIMUM DRIVE PER DAY: 10 hours. NEVER exceed this in any single day.\nEstimated driving time: ${routeInfo.durationDisplay} (${drivingHours.toFixed(1)} hours).\nDrive days one-way: ${travelDays} (ceil of hours / 10).\nTotal trip days: ${totalTripDays}.\n${tripTooShort ? 'WARNING: Trip is too short! Add warning to trip_summary highlights that user needs at least ' + minimumDaysNeeded + ' days for this route.' : ''}\nSCHEDULE RULE: Day 1 to Day ${travelDays} = DRIVE DAYS (en-route, NOT at destination).\nDay ${travelDays + 1} onwards = sightseeing at destination.\nLast ${travelDays} days = return drive back to ${fromCity}.\nARRIVAL DAY: If arriving after 14:00, only light evening walk + dinner. NO major monuments on arrival day.\nEach drive day: 06:00 depart -> 08:30 breakfast dhaba -> 13:00 lunch dhaba -> 18:30 check-in -> 20:30 dinner.\nFor micro-timings between random highway dhabas on drive days, calculate exactly based on distance / 60 km/hr. Do not hallucinate random travel times.\nONE hotel per city, do NOT change hotels daily at destination. If suggesting an overnight hotel en-route for the drive, label it clearly as "Suggested overnight stop — not booked".`;
+    userMessage += `\n\n- ROAD_TRIP_ENFORCEMENT:\nMAXIMUM DRIVE PER DAY: 10 hours. NEVER exceed this in any single day.\nEstimated driving time: ${routeInfo.durationDisplay} (${drivingHours.toFixed(1)} hours).\nDrive days one-way: ${travelDays} (ceil of hours / 10).\nTotal trip days: ${totalTripDays}.\n${tripTooShort ? 'WARNING: Trip is too short! Add warning to trip_summary highlights that user needs at least ' + minimumDaysNeeded + ' days for this route.' : ''}\nSCHEDULE RULE: Day 1 to Day ${travelDays} = DRIVE DAYS (en-route, NOT at destination).\nDay ${travelDays + 1} onwards = sightseeing at destination.\nLast ${travelDays} days = return drive back to ${fromCity}.\nARRIVAL DAY: If arriving after 14:00, only light evening walk + dinner. NO major monuments on arrival day.\nEach drive day: 06:00 depart -> 08:30 breakfast dhaba -> 13:00 lunch dhaba -> 18:30 check-in -> 20:30 dinner.\nFor micro-timings between random highway dhabas on drive days, calculate exactly based on distance / 60 km/hr. Do not hallucinate random travel times.\nONE hotel per city, do NOT change hotels daily at destination. If suggesting an overnight hotel en-route for the drive, label it clearly as "Suggested overnight stop â€” not booked".`;
   }
 
 
@@ -759,7 +759,7 @@ export async function generateTripPlan(config) {
   if (customPlaces && customPlaces.length > 0) {
     const placesDetails = customPlaces.map(p => {
       const sched = scheduleData[p.id] || { day: 'Day 1', timeSlot: 'Morning' };
-      return `* ${p.name} (City: ${p.city}, Assigned: ${sched.day} ${sched.timeSlot}, Fee: ₹${p.entrance_fee_inr}, DSLR Allowed: ${p.dslr_allowed}, Weekly Off: ${p.weekly_off})`;
+      return `* ${p.name} (City: ${p.city}, Assigned: ${sched.day} ${sched.timeSlot}, Fee: â‚¹${p.entrance_fee_inr}, DSLR Allowed: ${p.dslr_allowed}, Weekly Off: ${p.weekly_off})`;
     }).join('\n');
 
     userMessage += `\n\n- CUSTOMER_SELECTED_TOURIST_HUBS_AND_SCHEDULE:\n${placesDetails}`;
@@ -772,7 +772,7 @@ export async function generateTripPlan(config) {
     const sorted = [...hotelsList].sort((a, b) => (a.stayOrder || 1) - (b.stayOrder || 1));
     const hotelDetails = sorted.map((h, i) => {
       const name = h.property_name || h.name;
-      return `* Stay #${i + 1}: "${name}" (${h.hotel_stars || 3} Stars, ₹${h.price_per_night_inr || h.price_inr || 0}/night, Duration: ${h.nights || 1} Night(s))`;
+      return `* Stay #${i + 1}: "${name}" (${h.hotel_stars || 3} Stars, â‚¹${h.price_per_night_inr || h.price_inr || 0}/night, Duration: ${h.nights || 1} Night(s))`;
     }).join('\n');
 
     userMessage += `\n\n- CUSTOMER_SELECTED_HOTEL_STAY_SEQUENCE:\n${hotelDetails}`;
@@ -782,7 +782,7 @@ export async function generateTripPlan(config) {
   // Multi-Ride Bookings
   const ridesList = selectedRides.length > 0 ? selectedRides : (selectedRide ? [selectedRide] : []);
   if (ridesList.length > 0) {
-    const rideDetails = ridesList.map(r => `* Vehicle: ${r.vehicle_model} (${r.vehicle_category}, Type: ${r.booking_type}, Price: ₹${r.price}, Destination: ${r.tourist_place || r.city})`).join('\n');
+    const rideDetails = ridesList.map(r => `* Vehicle: ${r.vehicle_model} (${r.vehicle_category}, Type: ${r.booking_type}, Price: â‚¹${r.price}, Destination: ${r.tourist_place || r.city})`).join('\n');
     userMessage += `\n\n- BOOKED_GROUND_TRANSPORT_RIDES:\n${rideDetails}`;
   }
 
@@ -791,33 +791,33 @@ export async function generateTripPlan(config) {
     userMessage += `\n\n- USER_SELECTED_TRANSPORT_PREFERENCES:\n`;
     if (outboundTransport) {
       const obMode = outboundTransport.type || outboundTransport.mode || 'Vehicle';
-      userMessage += `\n* Outbound (Day 1 from ${fromCity}): ${obMode} via ${outboundTransport.operator} (${outboundTransport.depTime} - ${outboundTransport.arrTime}, ₹${outboundTransport.price || 0}/person)`;
+      userMessage += `\n* Outbound (Day 1 from ${fromCity}): ${obMode} via ${outboundTransport.operator} (${outboundTransport.depTime} - ${outboundTransport.arrTime}, â‚¹${outboundTransport.price || 0}/person)`;
     }
     if (returnTransport) {
       const retMode = returnTransport.type || returnTransport.mode || 'Vehicle';
-      userMessage += `\n* Return (Last Day): ${retMode} via ${returnTransport.operator} (${returnTransport.depTime} - ${returnTransport.arrTime}, ₹${returnTransport.price || 0}/person)`;
+      userMessage += `\n* Return (Last Day): ${retMode} via ${returnTransport.operator} (${returnTransport.depTime} - ${returnTransport.arrTime}, â‚¹${returnTransport.price || 0}/person)`;
     }
   }
 
-  // Live DSA Transport Data (from auto-generated itinerary — real API data)
+  // Live DSA Transport Data (from auto-generated itinerary â€” real API data)
   if (liveTransport && (liveTransport.outbound || liveTransport.return)) {
     const src = liveTransport.source || 'DSA';
-    userMessage += `\n\n- LIVE_DSA_TRANSPORT_DATA (from ${src} live API — USE THESE EXACT DETAILS):`;
+    userMessage += `\n\n- LIVE_DSA_TRANSPORT_DATA (from ${src} live API â€” USE THESE EXACT DETAILS):`;
     if (liveTransport.outbound) {
       const o = liveTransport.outbound;
-      userMessage += `\n* Outbound Flight/Bus (Day 1 from ${fromCity}): ${o.operator} ${o.code || ''}, Departs ${o.depTime}, Arrives ${o.arrTime}, Duration: ${o.duration}, Fare: ₹${o.price}/person, Baggage: ${o.baggage || 'N/A'}`;
+      userMessage += `\n* Outbound Flight/Bus (Day 1 from ${fromCity}): ${o.operator} ${o.code || ''}, Departs ${o.depTime}, Arrives ${o.arrTime}, Duration: ${o.duration}, Fare: â‚¹${o.price}/person, Baggage: ${o.baggage || 'N/A'}`;
     }
     if (liveTransport.return) {
       const r = liveTransport.return;
-      userMessage += `\n* Return Flight/Bus (Last Day): ${r.operator} ${r.code || ''}, Departs ${r.depTime}, Arrives ${r.arrTime}, Duration: ${r.duration}, Fare: ₹${r.price}/person, Baggage: ${r.baggage || 'N/A'}`;
+      userMessage += `\n* Return Flight/Bus (Last Day): ${r.operator} ${r.code || ''}, Departs ${r.depTime}, Arrives ${r.arrTime}, Duration: ${r.duration}, Fare: â‚¹${r.price}/person, Baggage: ${r.baggage || 'N/A'}`;
     }
     userMessage += `\n\nCRITICAL: Use the above LIVE DSA transport details verbatim in intercity_transport section. Set operator, dep_time, arr_time, duration, cost_inr from these values. Do NOT invent or use synthetic flight/bus details.`;
   }
 
   // Scheduled Dining (Cafes & Restaurants)
   if (selectedCafes.length > 0 || selectedRestaurants.length > 0) {
-    const cafesText = selectedCafes.map(c => `* Cafe: ${c.name} (${c.seats} guests, Assigned: ${c.day || 'Day 1'} ${c.timeSlot || 'Lunch'}, Rate for two: ₹${c.rate_for_two})`).join('\n');
-    const restText = selectedRestaurants.map(r => `* Restaurant: ${r.name} (${r.seats} guests, Assigned: ${r.day || 'Day 1'} ${r.timeSlot || 'Dinner'}, Price for two: ₹${r.price})`).join('\n');
+    const cafesText = selectedCafes.map(c => `* Cafe: ${c.name} (${c.seats} guests, Assigned: ${c.day || 'Day 1'} ${c.timeSlot || 'Lunch'}, Rate for two: â‚¹${c.rate_for_two})`).join('\n');
+    const restText = selectedRestaurants.map(r => `* Restaurant: ${r.name} (${r.seats} guests, Assigned: ${r.day || 'Day 1'} ${r.timeSlot || 'Dinner'}, Price for two: â‚¹${r.price})`).join('\n');
     userMessage += `\n\n- RESERVED_DINING_SCHEDULE:\n${cafesText}\n${restText}`;
     userMessage += `\n\nCRITICAL INSTRUCTION: Place the reserved cafes and restaurants into the itinerary on their requested Day and Time Slot (Meal time).`;
   }
@@ -924,8 +924,8 @@ export async function generateTripPlan(config) {
         if (cw) {
           const match = cw.dailySummary?.find(s => s.date === dateStr) || cw.dailySummary?.[0];
           if (match) {
-            const wIcon = match.maxRain >= 70 ? "🌧️" : match.maxRain >= 40 ? "🌦️" : "☀️";
-            day.weather_note = `${wIcon} ${match.maxTemp}°C / ${match.minTemp}°C, ${match.mainWeather} — Rain: ${match.maxRain}%`;
+            const wIcon = match.maxRain >= 70 ? "ðŸŒ§ï¸" : match.maxRain >= 40 ? "ðŸŒ¦ï¸" : "â˜€ï¸";
+            day.weather_note = `${wIcon} ${match.maxTemp}Â°C / ${match.minTemp}Â°C, ${match.mainWeather} â€” Rain: ${match.maxRain}%`;
           }
         }
         return day;
@@ -935,11 +935,11 @@ export async function generateTripPlan(config) {
       if (destWeather) {
         if (!parsed.trip_summary) parsed.trip_summary = {};
         const d1 = destWeather.dailySummary?.[0];
-        if (d1 && !parsed.trip_summary.weather_note) parsed.trip_summary.weather_note = `${d1.maxTemp}°C / ${d1.minTemp}°C, ${d1.mainWeather} (Rain: ${d1.maxRain}%)`;
+        if (d1 && !parsed.trip_summary.weather_note) parsed.trip_summary.weather_note = `${d1.maxTemp}Â°C / ${d1.minTemp}Â°C, ${d1.mainWeather} (Rain: ${d1.maxRain}%)`;
         if (destWeather.alerts) {
           const prec = getPrecautions(destWeather.alerts).slice(0, 2);
           if (prec.length > 0) {
-            const nonW = (parsed.tips || []).filter(t => !t.includes('Weather Precaution') && !t.startsWith('🌧') && !t.startsWith('🌦') && !t.startsWith('☀'));
+            const nonW = (parsed.tips || []).filter(t => !t.includes('Weather Precaution') && !t.startsWith('ðŸŒ§') && !t.startsWith('ðŸŒ¦') && !t.startsWith('â˜€'));
             parsed.tips = [...nonW, ...prec.map(p => `${p.icon} ${p.text}`)];
           }
         }

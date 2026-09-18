@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -48,7 +48,7 @@ export default function LivingMap() {
   const [selectedLocation, setSelectedLocation] = useState(null);
 
   useEffect(() => {
-    fetch('/data/locations.json')
+    fetch(`${import.meta.env.BASE_URL}data/locations.json`)
       .then(res => res.json())
       .then(data => setLocations(data.slice(0, 20)))
       .catch(err => console.error('Error loading locations:', err));
@@ -69,7 +69,7 @@ export default function LivingMap() {
           viewport={{ once: true }}
           className="text-center mb-10"
         >
-          <span className="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-4 py-1.5 rounded-full mb-4 tracking-wider uppercase">🗺️ Interactive</span>
+          <span className="inline-block bg-blue-100 text-blue-700 text-xs font-bold px-4 py-1.5 rounded-full mb-4 tracking-wider uppercase">ðŸ—ºï¸ Interactive</span>
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Living Map</h2>
           <p className="text-gray-500 mt-2">Click any pin to explore traveler reviews for that destination</p>
         </motion.div>
