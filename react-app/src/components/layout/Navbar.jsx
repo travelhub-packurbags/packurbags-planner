@@ -5,6 +5,7 @@ import { faBars, faXmark, faUser } from '@fortawesome/free-solid-svg-icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SignInButton, UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
 import useAppStore from '../../stores/useAppStore';
+import packurbagIcon from '../../assets/packurbag_icon.png';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -28,9 +29,16 @@ export default function Navbar() {
     <>
     <nav className="fixed top-0 left-0 w-full z-50 bg-[#121619]/95 backdrop-blur-md shadow-lg no-print">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        <Link to="/" onClick={handleLogoClick} className="flex items-center gap-2 cursor-pointer">
-          <img src="/files/logo.png" alt="Firstflight Travels" className="h-10 w-10 object-contain" />
-          <span className="text-white font-bold text-lg hidden sm:block font-display">Firstflight</span>
+        <Link to="/" onClick={handleLogoClick} className="flex items-center gap-2.5 cursor-pointer group">
+          <img 
+            src={packurbagIcon} 
+            alt="PackUrBag" 
+            className="h-9 w-9 rounded-xl object-contain shadow-sm group-hover:scale-105 transition-transform" 
+            onError={(e) => { e.target.src = '/files/packurbag_icon.png'; }}
+          />
+          <span className="text-white font-black text-xl tracking-tight font-display">
+            Pack<span className="text-[#f97316]">Ur</span>Bag
+          </span>
         </Link>
 
         {/* Desktop nav */}

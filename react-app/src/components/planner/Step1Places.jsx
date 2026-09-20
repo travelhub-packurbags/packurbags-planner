@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -25,8 +25,9 @@ import { fetchWeather, getPrecautions } from '../../services/weather';
 import { searchPlaces, getPlaceDetails, fetchGoogleAttractions } from '../../services/places';
 import { faSpinner, faLocationDot } from '@fortawesome/free-solid-svg-icons';
 import { fetchFoursquareImage } from '../../services/foursquare'; // Google Places â€” restaurants only (Step5)
-import { fetchWikipediaImage } from '../../services/wikipedia';    // Wikipedia â€” tourist places
+import { fetchWikipediaImage } from '../../services/wikipedia';    // Wikipedia — tourist places
 import { geocodeCityORS, fetchORSTouristPlaces, fetchNearestCityORS } from '../../services/orsPlaces'; // ORS fallback
+import { saveSelectedImage, getSelectedImage } from '../../services/supabaseStorage';
 
 export default function Step1Places({ destination, selectedPlaces, onTogglePlace, onNext, tripType = 'Family Trip' }) {
   const [places, setPlaces] = useState([]);
@@ -39,7 +40,78 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
   // Per-hub weather map { [cityName]: weatherData }
   const [cityWeatherMap, setCityWeatherMap] = useState({});
   const [filterByVibe, setFilterByVibe] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [placeImages, setPlaceImages] = useState({});
+
+  const CATEGORIES = [
+    'All',
+    'Historical',
+    'Temples',
+    'Beaches',
+    'Nature',
+    'Museums',
+    'Adventure',
+    'Food'
+  ];
+
+  const matchesCategory = (place, cat) => {
+    if (cat === 'All') return true;
+    const name = (place.name || '').toLowerCase();
+    const type = (place.type || '').toLowerCase();
+    const sig = (place.significance || '').toLowerCase();
+    const desc = (place.description || '').toLowerCase();
+    const catIds = place.category_ids || [];
+    const osm = place.osm_tags || {};
+    const osmHistoric = (osm.historic || '').toLowerCase();
+    const osmTourism = (osm.tourism || '').toLowerCase();
+    const osmAmenity = (osm.amenity || '').toLowerCase();
+    const osmNatural = (osm.natural || '').toLowerCase();
+    const osmLeisure = (osm.leisure || '').toLowerCase();
+    const osmSport = (osm.sport || '').toLowerCase();
+
+    if (cat === 'Historical') {
+      if (catIds.includes(268) || catIds.includes(150)) return true;
+      if (osmHistoric || osmTourism === 'monument' || osmHistoric === 'fort' || osmHistoric === 'monument' || osmHistoric === 'castle') return true;
+      return type.includes('historic') || type.includes('fort') || type.includes('monument') || type.includes('memorial') || type.includes('tomb') || type.includes('palace') || type.includes('ruins') || type.includes('heritage') || type.includes('gate') || sig.includes('historic') || name.includes('fort') || name.includes('palace') || name.includes('gate') || name.includes('tomb') || desc.includes('history') || desc.includes('historic');
+    }
+
+    if (cat === 'Temples') {
+      if (catIds.includes(550)) return true;
+      if (osmAmenity === 'place_of_worship' || osm.religion || osmTourism === 'temple') return true;
+      return type.includes('temple') || type.includes('mandir') || type.includes('mosque') || type.includes('masjid') || type.includes('church') || type.includes('cathedral') || type.includes('gurudwara') || type.includes('shrine') || type.includes('ashram') || type.includes('spiritual') || type.includes('religious') || sig.includes('religious') || name.includes('temple') || name.includes('mandir') || name.includes('church') || name.includes('mosque') || name.includes('gurudwara') || desc.includes('temple') || desc.includes('worship') || desc.includes('spiritual');
+    }
+
+    if (cat === 'Beaches') {
+      if (catIds.includes(380) && osmNatural === 'beach') return true;
+      if (osmNatural === 'beach' || osmTourism === 'beach') return true;
+      return type.includes('beach') || type.includes('coast') || type.includes('sea') || type.includes('shore') || name.includes('beach') || desc.includes('beach');
+    }
+
+    if (cat === 'Nature') {
+      if (catIds.includes(390) || catIds.includes(380) || catIds.includes(344)) return true;
+      if (['park', 'nature_reserve', 'garden'].includes(osmLeisure) || osmTourism === 'viewpoint') return true;
+      return type.includes('park') || type.includes('garden') || type.includes('lake') || type.includes('waterfall') || type.includes('falls') || type.includes('valley') || type.includes('hill') || type.includes('viewpoint') || type.includes('wildlife') || type.includes('sanctuary') || type.includes('forest') || type.includes('nature') || type.includes('river') || name.includes('lake') || name.includes('park') || name.includes('garden') || name.includes('falls') || name.includes('waterfall') || desc.includes('nature') || desc.includes('scenic');
+    }
+
+    if (cat === 'Museums') {
+      if (catIds.includes(267) || catIds.includes(191)) return true;
+      if (osmTourism === 'museum' || osmAmenity === 'arts_centre') return true;
+      return type.includes('museum') || type.includes('gallery') || type.includes('exhibition') || type.includes('planetarium') || type.includes('art') || name.includes('museum') || name.includes('gallery') || desc.includes('museum') || desc.includes('exhibit');
+    }
+
+    if (cat === 'Adventure') {
+      if (catIds.includes(530)) return true;
+      if (osmSport || osmLeisure === 'water_park' || osmTourism === 'theme_park') return true;
+      return type.includes('adventure') || type.includes('trek') || type.includes('trekking') || type.includes('water park') || type.includes('safari') || type.includes('rafting') || type.includes('camping') || type.includes('thrill') || name.includes('adventure') || name.includes('trek') || desc.includes('adventure') || desc.includes('trekking');
+    }
+
+    if (cat === 'Food') {
+      if (osmAmenity === 'restaurant' || osmAmenity === 'cafe' || osmAmenity === 'fast_food' || osmAmenity === 'food_court') return true;
+      return type.includes('food') || type.includes('dining') || type.includes('market') || type.includes('bazaar') || type.includes('cafe') || type.includes('restaurant') || type.includes('street food') || name.includes('market') || name.includes('bazaar') || name.includes('bazar') || desc.includes('food') || desc.includes('cuisine') || desc.includes('market');
+    }
+
+    return true;
+  };
 
   // StrictMode guard â€” prevents the double-invoke from firing loadPlacesAndWeather twice.
   // Reset when destination changes so a real city change re-fetches correctly.
@@ -170,28 +242,41 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
     const ctrl = { cancelled: false };
 
     (async () => {
-      // 50ms pause â€” StrictMode cleanup fires during this window, cancelling
-      // the first run before any request is sent.
       await new Promise(r => setTimeout(r, 50));
       if (ctrl.cancelled) return;
 
       let loaded = 0;
       for (const place of places) {
         if (ctrl.cancelled) break;
-        if (place.image) continue; // already has image
+        const isGenericFallback = (url) => !url || url.includes('1596178065887');
+
+        // Check if already in storage
+        const cached = getSelectedImage('place', place.id);
+        if (!isGenericFallback(cached)) {
+          place.image = cached;
+          setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: cached }));
+          continue;
+        }
+
+        if (place.image && !isGenericFallback(place.image)) {
+          saveSelectedImage('place', place.id, place.image, { name: place.name, city: place.city });
+          continue;
+        }
+
         const img = await fetchWikipediaImage(place.name, place.city);
         if (ctrl.cancelled) break;
         if (img) {
+          place.image = img;
+          saveSelectedImage('place', place.id, img, { name: place.name, city: place.city });
           setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: img }));
           loaded++;
         }
-        // 100ms gap â€” Wikipedia is very generous but let's be polite
-        await new Promise(r => setTimeout(r, 100));
+        await new Promise(r => setTimeout(r, 60));
       }
 
       if (!ctrl.cancelled && loaded > 0) {
         toast.success(
-          `ðŸ“¸ ${loaded} tourist spot photo${loaded > 1 ? 's' : ''} loaded via Wikipedia!`,
+          `📸 ${loaded} tourist spot photo${loaded > 1 ? 's' : ''} loaded via Wikipedia!`,
           { position: 'bottom-right', autoClose: 3000 }
         );
       }
@@ -317,6 +402,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
   const sortedAndFilteredPlaces = [...places]
     .map(p => ({ ...p, vibeScore: getSpotRelevanceScore(p) }))
     .filter(p => !filterByVibe || p.vibeScore >= 1)
+    .filter(p => matchesCategory(p, selectedCategory))
     .sort((a, b) => b.vibeScore - a.vibeScore);
 
   const displayedPlaces = sortedAndFilteredPlaces.filter(p => 
@@ -400,9 +486,9 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
       </div>
 
       {/* Trip Vibe Curator Banner */}
-      <div className="mb-6 bg-amber-500/10 border border-[#D4B15A]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+      <div className="mb-4 bg-amber-500/10 border border-[#D4B15A]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <span className="text-base">âœ¨</span>
+          <span className="text-base">✨</span>
           <div>
             <span className="font-extrabold text-[#D4B15A] uppercase tracking-wider block">
               Curated for {tripType}
@@ -422,20 +508,50 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         </button>
       </div>
 
+      {/* Category Filter Pills (Image 1 & 2) */}
+      <div className="flex items-center gap-2.5 overflow-x-auto pb-2 mb-6 scrollbar-none">
+        {CATEGORIES.map(cat => {
+          const isActive = selectedCategory === cat;
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-5 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all shadow-sm cursor-pointer ${
+                isActive
+                  ? 'bg-[#f97316] text-white shadow-orange-300/40 font-bold'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200/90'
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4B15A]"></div>
         </div>
       ) : displayedPlaces.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center px-4">
-          <div className="text-5xl mb-4">ðŸ—ºï¸</div>
+          <div className="text-5xl mb-4">🗺️</div>
           <h3 className="text-xl font-bold text-gray-700 mb-2">No Tourist Hotspots Found</h3>
           <p className="text-gray-500 text-sm max-w-md">
-            We don't have curated tourist spots for <strong>{destination}</strong> in our dataset yet.
-            You can still use the <strong>Search bar above</strong> to find and add specific attractions manually.
+            {selectedCategory !== 'All' 
+              ? `No "${selectedCategory}" spots found for ${destination}. Try selecting "All" or searching manually.` 
+              : `We don't have curated tourist spots for ${destination} in our dataset yet. You can still use the Search bar above to find and add specific attractions manually.`}
           </p>
+          {selectedCategory !== 'All' && (
+            <button
+              onClick={() => setSelectedCategory('All')}
+              className="mt-3 text-xs font-bold text-[#D4B15A] bg-[#121619] px-4 py-2 rounded-xl"
+            >
+              Show All Spots
+            </button>
+          )}
           <p className="text-xs text-gray-400 mt-3">
-            You can skip this step and proceed directly by clicking <strong>"Schedule (0)"</strong> â†’ the AI will still plan your trip.
+            You can skip this step and proceed directly by clicking <strong>"Schedule (0)"</strong> → the AI will still plan your trip.
           </p>
         </div>
       ) : (
@@ -453,7 +569,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                 }`}
               >
                 <div>
-                  {/* Place Image â€” Google photo (for searched places) or Wikipedia fallback */}
+                  {/* Place Image — Google photo (for searched places) or Wikipedia fallback */}
                   {(place.image || placeImages[`${place.name}::${place.city}`]) && (
                     <div className="mb-3 rounded-xl overflow-hidden h-40 w-full">
                       <img
@@ -467,12 +583,12 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                   {/* Category & Badge */}
                   <div className="flex justify-between items-start gap-2 mb-3">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A] bg-[#D4B15A]/10 px-2.5 py-1 rounded-md">
+                      <span className="text-[10px] font-extrabold uppercase tracking-widest text-white bg-[#1f2937] px-3 py-1 rounded-md shadow-sm">
                         {place.type || 'Attraction'}
                       </span>
                       {place.nearbyNote && (
                         <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md">
-                          ðŸ“ {place.nearbyNote}
+                          📍 {place.nearbyNote}
                         </span>
                       )}
                     </div>
@@ -515,7 +631,10 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                   </button>
 
                   <button
-                    onClick={() => onTogglePlace(place)}
+                    onClick={() => {
+                      const spotImg = place.image || placeImages[`${place.name}::${place.city}`];
+                      onTogglePlace({ ...place, image: spotImg || place.image });
+                    }}
                     className={`text-xs font-bold px-4 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
                       isSelected
                         ? 'bg-emerald-600 text-white shadow-md'
@@ -700,7 +819,8 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
 
               <button
                 onClick={() => {
-                  onTogglePlace(activeModalPlace);
+                  const spotImg = activeModalPlace.image || placeImages[`${activeModalPlace.name}::${activeModalPlace.city}`];
+                  onTogglePlace({ ...activeModalPlace, image: spotImg || activeModalPlace.image });
                   setActiveModalPlace(null);
                 }}
                 className={`px-5 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${

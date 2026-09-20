@@ -17,6 +17,7 @@ import {
 import { toast } from 'react-toastify';
 import { searchPlaces, getPlaceDetails, geocodeCity, getGoogleKey } from '../../services/places';
 import { getRoute } from '../../services/routing';
+import { geocodePlaceORS } from '../../services/orsPlaces';
 import { faCamera } from '@fortawesome/free-solid-svg-icons';
 
 // Custom pin marker icon for map stops
@@ -40,8 +41,28 @@ const stopPinIcon = L.divIcon({
   iconAnchor: [12, 12]
 });
 
+// Restaurant marker — orange background with fork emoji
+const restaurantPinIcon = L.divIcon({
+  className: '',
+  html: `<div style="
+    width: 28px;
+    height: 28px;
+    background: #f97316;
+    color: white;
+    border: 2px solid #ea580c;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    box-shadow: 0 4px 10px rgba(249,115,22,0.5);
+  ">🍴</div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14]
+});
+
 // Helper component to auto-recenter map view to fit route bounds
-function MapBoundsFitter({ polylineCoords, stops }) {
+function MapBoundsFitter({ polylineCoords, stops = [], restaurantMarkers = [] }) {
   const map = useMap();
 
   useEffect(() => {
@@ -52,14 +73,17 @@ function MapBoundsFitter({ polylineCoords, stops }) {
         const bounds = L.latLngBounds(validPoly);
         map.fitBounds(bounds, { padding: [40, 40] });
       }
-    } else if (stops && stops.length > 0) {
-      const validStops = stops.filter(s => s && s.lat && s.lng && !isNaN(Number(s.lat)) && !isNaN(Number(s.lng)));
-      if (validStops.length > 0) {
-        const bounds = L.latLngBounds(validStops.map(s => [Number(s.lat), Number(s.lng)]));
+    } else {
+      const allPts = [
+        ...stops.filter(s => s && s.lat && s.lng && !isNaN(Number(s.lat)) && !isNaN(Number(s.lng))).map(s => [Number(s.lat), Number(s.lng)]),
+        ...restaurantMarkers.filter(r => r && r.lat && r.lng && !isNaN(Number(r.lat)) && !isNaN(Number(r.lng))).map(r => [Number(r.lat), Number(r.lng)])
+      ];
+      if (allPts.length > 0) {
+        const bounds = L.latLngBounds(allPts);
         map.fitBounds(bounds, { padding: [40, 40] });
       }
     }
-  }, [map, polylineCoords, stops]);
+  }, [map, polylineCoords, stops, restaurantMarkers]);
 
   return null;
 }
@@ -85,7 +109,7 @@ function RouteUpdater({ routeInfo, stops }) {
   return null;
 }
 
-export default function RouteMapPanel({ initialStops = [], onStopsChange = null, onCaptureSnippet = null, fromCity = null, toCity = null }) {
+export default function RouteMapPanel({ initialStops = [], onStopsChange = null, onCaptureSnippet = null, fromCity = null, toCity = null, restaurants = [] }) {
   const [stops, setStops] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -93,6 +117,49 @@ export default function RouteMapPanel({ initialStops = [], onStopsChange = null,
   const [loadingRoute, setLoadingRoute] = useState(false);
   const [routeInfo, setRouteInfo] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [restaurantMarkers, setRestaurantMarkers] = useState([]);
+
+  // Geocode restaurants via ORS API and build map markers
+  useEffect(() => {
+    if (!restaurants || restaurants.length === 0) { setRestaurantMarkers([]); return; }
+    let cancelled = false;
+    const geocode = async () => {
+      const markers = [];
+      for (const r of restaurants) {
+        // Use existing coords if available
+        let lat = Number(r.lat || r.latitude || 0);
+        let lng = Number(r.lng || r.longitude || 0);
+        if (!lat || !lng || isNaN(lat) || isNaN(lng)) {
+          // Geocode via ORS API
+          const query = r.address ? `${r.name}, ${r.address}` : (r.city ? `${r.name}, ${r.city}` : r.name);
+          try {
+            const res = await geocodePlaceORS(query);
+            if (res && res.lat && res.lng) {
+              lat = res.lat;
+              lng = res.lng;
+            }
+          } catch (err) {
+            console.warn(`Failed to geocode restaurant ${r.name} via ORS:`, err);
+          }
+        }
+        if (!cancelled && lat && lng && !isNaN(lat) && !isNaN(lng)) {
+          markers.push({ 
+            id: r.id || r.name, 
+            name: r.name, 
+            lat, 
+            lng, 
+            address: r.address || r.locality || r.city || '', 
+            cuisine: r.cuisines || r.cuisine || '' 
+          });
+        }
+      }
+      if (!cancelled) setRestaurantMarkers(markers);
+    };
+    geocode();
+    return () => { cancelled = true; };
+  }, [restaurants]);
+
+
 
   const handleCaptureSnippet = () => {
     if (!onCaptureSnippet) return;
@@ -497,7 +564,20 @@ export default function RouteMapPanel({ initialStops = [], onStopsChange = null,
               <Popup>
                 <div className="p-1 text-center">
                   <p className="font-bold text-xs text-gray-900">Stop #{idx + 1}: {s.name}</p>
-                  {s.address && <p className="text-[11px] text-gray-500 mt-0.5">{s.address}</p>}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {/* Restaurant markers — orange fork icon */}
+          {restaurantMarkers.map((r, idx) => (
+            <Marker key={`rest_${r.id || idx}`} position={[Number(r.lat), Number(r.lng)]} icon={restaurantPinIcon}>
+              <Popup>
+                <div className="p-1">
+                  <p className="font-bold text-xs text-orange-700">🍴 {r.name}</p>
+                  {r.address && <p className="text-[11px] text-gray-500 mt-0.5">📍 {r.address}</p>}
+                  {r.cuisine && <p className="text-[11px] text-gray-400 mt-0.5">{r.cuisine}</p>}
+                  <p className="text-[10px] text-orange-500 font-bold mt-1">Your Chosen Restaurant</p>
                 </div>
               </Popup>
             </Marker>
@@ -505,8 +585,22 @@ export default function RouteMapPanel({ initialStops = [], onStopsChange = null,
 
           {/* Fit map bounds dynamically */}
           <RouteUpdater routeInfo={routeInfo} stops={stops} />
-          <MapBoundsFitter polylineCoords={routeInfo?.polylineCoords} stops={stops} />
+          <MapBoundsFitter polylineCoords={routeInfo?.polylineCoords} stops={stops} restaurantMarkers={restaurantMarkers} />
         </MapContainer>
+
+        {/* Map legend */}
+        <div className="absolute bottom-3 left-3 z-[1000] bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl px-3 py-2 text-[11px] shadow-md flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <span className="w-4 h-4 rounded-full bg-[#121619] border border-[#D4B15A] flex items-center justify-center text-[8px]">📍</span>
+            <span className="text-gray-700 font-semibold">Tourist Stops</span>
+          </div>
+          {restaurantMarkers.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center text-[8px]">🍴</span>
+              <span className="text-orange-700 font-semibold">Your Restaurants ({restaurantMarkers.length})</span>
+            </div>
+          )}
+        </div>
       </div>
 
     </div>

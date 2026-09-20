@@ -260,21 +260,23 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
   );
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden flex flex-col h-full">
+    <div className="bg-white rounded-3xl shadow-xl border border-gray-200/80 p-3.5 overflow-hidden flex flex-col h-full">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between gap-2 shrink-0">
+      <div className="px-1.5 py-1.5 flex items-center justify-between gap-2 shrink-0 mb-1">
         <div className="min-w-0">
-          <h3 className="text-sm font-bold text-gray-900">🗺️ Live Route Map</h3>
-          <p className="text-[10px] text-gray-400 truncate">{fromCity} → {destinations}</p>
+          <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-1.5">
+            <span>🗺️</span> Live Route Map
+          </h3>
+          <p className="text-[11px] text-gray-500 font-medium truncate mt-0.5">{fromCity} → {destinations}</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* DSA Signal */}
           {dsaLive === null ? (
-            <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+            <span className="flex items-center gap-1 text-[10px] font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">
               <FontAwesomeIcon icon={faSpinner} spin className="text-[10px]" /> Loading
             </span>
           ) : dsaLive ? (
-            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+            <span className="flex items-center gap-1.5 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full shadow-2xs">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -282,8 +284,7 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
               Live DSA
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-1 rounded-full">
-              <span className="inline-flex h-2 w-2 rounded-full bg-red-500"></span>
+            <span className="flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">
               Fallback
             </span>
           )}
@@ -293,29 +294,38 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
               onClick={handleCaptureSnippet}
               disabled={isCapturing || loading}
               title="Take snippet for itinerary"
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 transition-colors"
+              className="bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
             >
-              <FontAwesomeIcon icon={faCamera} />
+              <FontAwesomeIcon icon={faCamera} className="text-[9px]" />
               {isCapturing ? '...' : 'Snippet'}
             </button>
           )}
         </div>
       </div>
 
-      {/* Route stats */}
+      {/* Route stats pill (Image 2 & 5) */}
       {routeInfo && (
-        <div className="px-3 py-1.5 flex items-center gap-3 text-[10px] font-semibold text-gray-600 bg-white border-b border-gray-50 shrink-0 flex-wrap">
-          <span>🛣️ {routeInfo.distanceKm} km</span>
+        <div className="my-2 p-2 px-3 flex items-center justify-around text-xs font-bold text-gray-700 bg-gray-50/90 border border-gray-100 rounded-xl shrink-0 shadow-2xs">
+          <span className="flex items-center gap-1 text-gray-800">
+            <span className="text-amber-500">📍</span> {routeInfo.distanceKm} km
+          </span>
           <span className="text-gray-300">|</span>
-          <span>⏱️ {routeInfo.durationDisplay}</span>
+          <span className="flex items-center gap-1 text-gray-800">
+            <span className="text-indigo-500">⏱️</span> {routeInfo.durationDisplay}
+          </span>
           {routeInfo.fuelCostInr > 0 && (
-            <><span className="text-gray-300">|</span><span>⛽ ₹{routeInfo.fuelCostInr}</span></>
+            <>
+              <span className="text-gray-300">|</span>
+              <span className="flex items-center gap-1 text-gray-800">
+                <span className="text-emerald-500">⛽</span> ₹{routeInfo.fuelCostInr}
+              </span>
+            </>
           )}
         </div>
       )}
 
-      {/* Map */}
-      <div className="flex-grow relative">
+      {/* Map with rounded border */}
+      <div className="flex-grow relative rounded-2xl overflow-hidden border border-gray-200/70 shadow-inner">
         {loading && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-[500] bg-white/85 backdrop-blur-sm">
             <FontAwesomeIcon icon={faSpinner} spin className="text-3xl text-[#D4B15A] mb-2" />

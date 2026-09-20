@@ -11,7 +11,11 @@
 const WIKI_API    = 'https://en.wikipedia.org/w/api.php';
 const COMMONS_API = 'https://commons.wikimedia.org/w/api.php';
 
+// MediaWiki policy requires a User-Agent header for non-browser/node clients
+const defaultHeaders = typeof window === 'undefined' ? { 'User-Agent': 'PackUrBagTravel/1.0 (info@packurbag.com)' } : undefined;
+
 // ─── Image quality filters ────────────────────────────────────────────────────
+
 
 // Filename substrings that indicate the image is NOT a place/food photo
 const BAD_FILENAME_TOKENS = [
@@ -58,7 +62,7 @@ async function searchCommons(query) {
       origin: '*',
     });
 
-    const searchRes = await fetch(`${COMMONS_API}?${searchParams}`);
+    const searchRes = await fetch(`${COMMONS_API}?${searchParams}`, { headers: defaultHeaders });
     if (!searchRes.ok) return null;
 
     const searchData = await searchRes.json();
@@ -84,7 +88,7 @@ async function searchCommons(query) {
         origin: '*',
       });
 
-      const infoRes = await fetch(`${COMMONS_API}?${infoParams}`);
+      const infoRes = await fetch(`${COMMONS_API}?${infoParams}`, { headers: defaultHeaders });
       if (!infoRes.ok) continue;
 
       const infoData = await infoRes.json();
@@ -158,49 +162,80 @@ export async function fetchWikipediaImage(placeName, cityName = '') {
 }
 
 /**
- * Internal: fetches Wikipedia pageimages thumbnail.
- * Uses two attempts: "{name} {city}" then just "{name}".
+ * Internal: fetches Wikipedia pageimages thumbnail using both search generator and direct title lookup.
  */
 async function _fetchWikiPageimage(name, city = '') {
+  if (!name) return null;
+  // Clean dots, ellipsis, and unnecessary parenthesis from spot names
+  const cleanName = name.replace(/\.{2,}/g, '').replace(/\s*\([^)]*\)/g, '').trim();
   const queries = [
-    city ? `${name} ${city}` : name,
-    name,
-  ];
+    cleanName,
+    city ? `${cleanName} ${city}`.trim() : null,
+  ].filter(Boolean);
 
   for (const query of queries) {
     try {
-      const params = new URLSearchParams({
+      // 1. Try search generator (finds article even with slight spelling/suffix differences)
+      const searchParams = new URLSearchParams({
+        action: 'query',
+        generator: 'search',
+        gsrsearch: query,
+        gsrlimit: '1',
+        prop: 'pageimages',
+        format: 'json',
+        pithumbsize: '600',
+        origin: '*',
+        redirects: '1',
+      });
+
+      const searchRes = await fetch(`${WIKI_API}?${searchParams}`, { headers: defaultHeaders });
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const pages = searchData.query?.pages;
+        if (pages) {
+          const page = Object.values(pages)[0];
+          const src = page?.thumbnail?.source;
+          if (src) {
+            const filename = src.split('/').pop() || '';
+            const { width, height } = page.thumbnail;
+            if (!isBadImage(filename, width, height)) {
+              return src;
+            }
+          }
+        }
+      }
+
+      // 2. Direct title lookup fallback with automatic redirect resolution
+      const directParams = new URLSearchParams({
         action: 'query',
         titles: query,
         prop: 'pageimages',
         format: 'json',
         pithumbsize: '600',
         origin: '*',
+        redirects: '1',
       });
 
-      const res = await fetch(`${WIKI_API}?${params}`);
-      if (!res.ok) continue;
-
-      const data = await res.json();
-      const pages = data.query?.pages;
-      if (!pages) continue;
-
-      const page = Object.values(pages)[0];
-      // page.missing = article not found; skip
-      if ('missing' in page) continue;
-
-      const src = page.thumbnail?.source;
-      if (!src) continue;
-
-      // Extract filename from URL for quality filtering
-      const filename = src.split('/').pop() || '';
-      const { width, height } = page.thumbnail;
-      if (isBadImage(filename, width, height)) continue;
-
-      return src;
+      const directRes = await fetch(`${WIKI_API}?${directParams}`, { headers: defaultHeaders });
+      if (directRes.ok) {
+        const directData = await directRes.json();
+        const pages = directData.query?.pages;
+        if (pages) {
+          const page = Object.values(pages)[0];
+          if (!('missing' in page) && page.thumbnail?.source) {
+            const src = page.thumbnail.source;
+            const filename = src.split('/').pop() || '';
+            const { width, height } = page.thumbnail;
+            if (!isBadImage(filename, width, height)) {
+              return src;
+            }
+          }
+        }
+      }
     } catch (err) {
-      console.warn(`[Wikipedia] Error for "${query}":`, err.message);
+      console.warn(`[Wikipedia] Error fetching image for "${query}":`, err.message);
     }
   }
   return null;
 }
+

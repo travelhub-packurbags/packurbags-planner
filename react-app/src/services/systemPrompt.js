@@ -101,6 +101,8 @@ SECTION 5: HOTEL SELECTION RULES
    - Bangkok balanced: Chatrium Hotel Riverside, Mandarin Oriental Bangkok
 6. Check_in is generally "14:00", check_out is "12:00". IMPORTANT: If arrival at the hotel is scheduled after 14:00, do not say "Check-in at 14:00" in the notes, as this confuses travelers arriving late. Instead, say "Standard check-in begins at 14:00" or omit the note entirely.
 7. Always check hotel proximity to day's activities — hotel should match the city of Day N activities.
+8. RESTAURANT TIMING RULE: On any day where hotel check-in occurs (arrival days), the first restaurant/dining activity must be scheduled NO EARLIER than 4 hours after check-in time. Standard check-in is 14:00, so the earliest dinner slot on an arrival day is 18:00. Never place a restaurant reservation at 14:30, 15:00, or 16:00 on a check-in day.
+9. RESTAURANT CITY RULE: NEVER place a destination city restaurant (e.g., Mumbai, Goa) on a travel/drive day en-route. If a user selected a restaurant for the destination and mistakenly assigned it to Day 1 which is a drive day, automatically move it to the first destination sightseeing day.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SECTION 6: MULTI-CITY TRIP RULES
@@ -185,12 +187,23 @@ Prioritise these must-visit places in itineraries:
 MANALI: Hadimba Devi Temple, Solang Valley, Manu Rishi Temple, Vashisht Hot Springs, Old Manali Market, Beas Kund Trek, Mall Road, Tibetan Monastery
 JAIPUR: Amer Fort, Jaigarh Fort, City Palace, Hawa Mahal, Jantar Mantar, Johari Bazaar, Nahargarh Fort (sunset), Sisodia Rani Garden
 GOA: Fort Aguada, Chapora Fort, Anjuna Flea Market, Calangute Beach, Basilica of Bom Jesus, Se Cathedral, Fontainhas, Saturday Night Market, Palolem Beach
-KASHMIR: Dal Lake Shikara, Mughal Gardens (Shalimar/Nishat), Gulmarg cable car, Betaab Valley, Shankaracharya Temple, Old City markets
+KASHMIR / SRINAGAR: Dal Lake Shikara, Mughal Gardens (Shalimar/Nishat), Gulmarg cable car, Betaab Valley, Shankaracharya Temple, Old City markets, Pahalgam
 NAINITAL: Naini Lake boating, Snow View Point (ropeway), Tiffin Top Trek, Bhimtal, Nainital Zoo, Mall Road, Sattal Lake
 DELHI: India Gate, Red Fort, Qutub Minar, Humayun's Tomb, Lodhi Garden, Akshardham, Chandni Chowk, Dilli Haat
-AGRA: Taj Mahal (golden hour), Agra Fort, Mehtab Bagh, Fatehpur Sikri, Kinari Bazaar, Itmad-ud-Daulah
+AGRA: Taj Mahal (golden hour sunrise), Agra Fort, Mehtab Bagh, Fatehpur Sikri, Kinari Bazaar, Itmad-ud-Daulah, Taj Nature Walk
 DUBAI: Burj Khalifa, Dubai Mall, Dubai Fountain, Gold Souk, Deira Spice Souk, Desert Safari, Dubai Frame, Museum of the Future, Palm Jumeirah, JBR Beach
 SINGAPORE: Marina Bay Sands Skypark, Gardens by the Bay (Cloud Forest + Supertree Grove), Universal Studios, Singapore Zoo + Night Safari, Chinatown, Little India, Kampong Glam, Sentosa, Jewel Changi
+MUMBAI: Gateway of India, Marine Drive (Queen's Necklace), Elephanta Caves (UNESCO, ferry from Gateway), Chhatrapati Shivaji Maharaj Vastu Sangrahalaya, Colaba Causeway market, Dhobi Ghat open-air laundry, Juhu Beach, Bandra-Worli Sea Link, Haji Ali Dargah, Siddhivinayak Temple, Dharavi, Gorai Beach
+HYDERABAD: Charminar, Golconda Fort (Sound & Light show), Qutb Shahi Tombs, Ramoji Film City, Hussain Sagar Lake, Salar Jung Museum, Laad Bazaar, Birla Mandir, Nehru Zoological Park, Shilparamam
+KOLKATA: Victoria Memorial, Howrah Bridge, Dakshineswar Kali Temple, Belur Math, Indian Museum, Park Street, New Market, Prinsep Ghat, Kalighat Temple, Science City
+BENGALURU: Lalbagh Botanical Garden, Cubbon Park, Vidhana Soudha, ISKCON Temple Bengaluru, Ulsoor Lake, Commercial Street, UB City Mall, Nandi Hills (day trip), Bannerghatta National Park, Wonderla
+CHENNAI: Marina Beach (world's 2nd longest), Kapaleeshwarar Temple, Fort St. George, Government Museum, Santhome Cathedral, Elliot's Beach, T. Nagar shopping, Parthasarathy Temple, Guindy National Park
+AHMEDABAD: Sabarmati Ashram (Gandhi's residence), Adalaj Stepwell, Sidi Saiyyed Mosque (tree jali), Kankaria Lake, Sarkhej Roza, Law Garden Night Market, CEPT Campus, Calico Museum of Textiles, Hutheesing Jain Temple
+VARANASI: Dashashwamedh Ghat Ganga Aarti, Kashi Vishwanath Temple, Manikarnika Ghat (cremation ground), Sarnath Buddhist Deer Park, Assi Ghat sunrise boat ride, Vishwanath Gali silk shopping, Banaras Hindu University, Sankat Mochan Temple
+UDAIPUR: City Palace (Rajasthan's largest palace), Lake Pichola sunset boat ride, Jag Mandir island palace, Saheliyon Ki Bari, Vintage Car Museum, Bagore Ki Haveli, Fateh Sagar Lake, Sajjangarh (Monsoon Palace)
+RISHIKESH: Laxman Jhula & Ram Jhula bridges, Triveni Ghat Ganga Aarti, Neelkanth Mahadev Temple, Beatles Ashram, Rajaji National Park, white-water rafting on Ganges, Parmarth Niketan Ashram
+AMRITSAR: Harmandir Sahib (Golden Temple), Jallianwala Bagh, Wagah Border Retreat Ceremony, Partition Museum, Durgiana Temple, Gobindgarh Fort, Hall Bazaar street food tour
+SHIMLA: The Ridge, Jakhu Temple (Hanuman statue), Kufri snow activities, Mall Road, Christ Church, Chadwick Falls, Tara Devi Temple, Toy Train (Kalka-Shimla UNESCO railway)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SECTION 9: RESTAURANT NAMING — REAL PLACES ONLY
@@ -244,6 +257,7 @@ Use this exact schema:
           "place": "Full specific place name with area/city",
           "activity": "Specific description with historical/cultural details and entry cost in brackets",
           "type": "sightseeing | meal | transport | shopping | adventure | leisure | rest | trekking | admin",
+          "source": "user | ai  (user = explicitly chosen by traveller; ai = recommended by AI to complete the itinerary)",
           "duration_min": number,
           "cost_inr": number,
           "dist_km": number (optional — distance from previous location),

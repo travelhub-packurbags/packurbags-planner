@@ -14,3 +14,13 @@ scan_secrets.py
 backend/test_*.js
 backend/find_*.js
 backend/temp_hotels.json
+
+# Local / temporary root uploads
+desktop.ini
+*.pdf
+review*.jpeg
+review*.jpg
+files/
+gateway_india_bg.jpg
+marine_drive_bg.jpg
+

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { searchRestaurants } from '../../services/places';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -59,6 +59,7 @@ export default function Step5Dining({
   onRemoveCafeReservation,
   onUpdateCafeConfig,
   selectedRestaurants = [],
+  onToggleRestaurant,
   onAddRestaurantReservation,
   onRemoveRestaurantReservation,
   onUpdateRestaurantConfig,
@@ -73,6 +74,21 @@ export default function Step5Dining({
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [restaurantImages, setRestaurantImages] = useState({});
+
+  const handleToggle = (rest) => {
+    const spotImg = restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image;
+    if (onToggleRestaurant) {
+      onToggleRestaurant({ ...rest, image: spotImg || rest.image });
+    } else {
+      const isSelected = selectedRestaurants.some(r => r.id === rest.id || (r.bookingId && r.bookingId.startsWith(`r_${rest.id}_`)));
+      if (isSelected) {
+        const existing = selectedRestaurants.filter(r => r.id === rest.id || (r.bookingId && r.bookingId.startsWith(`r_${rest.id}_`)));
+        existing.forEach(b => onRemoveRestaurantReservation(b.bookingId || b.id || rest.id));
+      } else {
+        onAddRestaurantReservation({ ...rest, image: spotImg || rest.image }, 'Day 1', 'Dinner');
+      }
+    }
+  };
 
   // Filters
   const [searchName, setSearchName] = useState('');
@@ -194,14 +210,14 @@ export default function Step5Dining({
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
-          <span className="text-xs font-bold text-[#D4B15A] uppercase tracking-widest bg-[#D4B15A]/10 px-3 py-1 rounded-full border border-[#D4B15A]/20">
-            Step 5: Restaurant Reservations
+          <span className="text-xs font-bold text-[#f97316] uppercase tracking-widest bg-orange-50 px-3.5 py-1 rounded-full border border-orange-200/80">
+            Step 5: Choose Restaurants
           </span>
-          <h2 className="text-3xl font-display font-bold text-gray-900 mt-2">
-            Reserve Tables in Top Restaurants
+          <h2 className="text-3xl font-display font-extrabold text-gray-900 mt-2">
+            Choose Restaurants for Your Trip
           </h2>
           <p className="text-gray-500 text-xs mt-1">
-            Choose day and meal time slots for each restaurant.
+            Pick your preferred dining spots and food hubs ({selectedRestaurants.length} selected).
           </p>
         </div>
 
@@ -209,14 +225,14 @@ export default function Step5Dining({
           onClick={onNext}
           className="bg-[#121619] hover:bg-[#1e2429] text-[#D4B15A] font-bold px-8 py-3 rounded-xl transition-all shadow-md text-xs cursor-pointer flex items-center gap-2"
         >
-          <span>Next: Review Trip ({selectedRestaurants.length})</span>
+          <span>Next: Review Trip ({selectedRestaurants.length} Selected)</span>
           <FontAwesomeIcon icon={faArrowRight} />
         </button>
       </div>
 
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-bold text-gray-900 font-display flex items-center gap-2">
-          <FontAwesomeIcon icon={faUtensils} className="text-[#D4B15A]" /> Top Rated Restaurants ({restaurants.length})
+          <FontAwesomeIcon icon={faUtensils} className="text-[#f97316]" /> Top Rated Restaurants ({restaurants.length})
         </h3>
         <button
           onClick={handleGoogleSearch}
@@ -234,28 +250,34 @@ export default function Step5Dining({
 
       {loading ? (
         <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#D4B15A]"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#f97316]"></div>
         </div>
       ) : (
 
         /* Restaurants List */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {restaurants.map(rest => {
-            const restBookings = selectedRestaurants.filter(r => r.id === rest.id || (r.bookingId && r.bookingId.startsWith(`r_${rest.id}_`)));
-            const isSelected = restBookings.length > 0;
+            const isSelected = selectedRestaurants.some(r => r.id === rest.id || (r.bookingId && r.bookingId.startsWith(`r_${rest.id}_`)));
+            const spotImg = restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image;
+
             return (
               <div 
                 key={rest.id}
-                className={`bg-white rounded-2xl p-5 border transition-all flex flex-col justify-between ${
+                onClick={() => handleToggle(rest)}
+                className={`bg-white rounded-2xl p-5 border transition-all duration-200 flex flex-col justify-between cursor-pointer ${
                   isSelected 
-                    ? 'border-[#D4B15A] ring-2 ring-[#D4B15A]/30 shadow-lg' 
-                    : 'border-gray-200 hover:shadow-md'
+                    ? 'border-[#f97316] ring-2 ring-[#f97316]/30 shadow-md bg-orange-50/10' 
+                    : 'border-gray-200 hover:border-orange-300 hover:shadow-md'
                 }`}
               >
                 <div>
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#D4B15A] bg-[#D4B15A]/10 px-2.5 py-0.5 rounded-md">
-                      Restaurant {restBookings.length > 1 ? `(${restBookings.length} Slots)` : ''}
+                    <span className={`text-[10px] uppercase font-extrabold tracking-widest px-2.5 py-0.5 rounded-md ${
+                      isSelected 
+                        ? 'text-white bg-[#f97316]' 
+                        : 'text-[#f97316] bg-orange-50 border border-orange-200/60'
+                    }`}>
+                      {isSelected ? '✓ Chosen' : 'Restaurant'}
                     </span>
                     <div className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded-lg text-xs">
                       {renderStars(rest.avg_rating || rest.rating || 4.0)}
@@ -263,102 +285,56 @@ export default function Step5Dining({
                     </div>
                   </div>
 
-                  {/* Restaurant Image â€” Google Places photo preferred, Unsplash fallback */}
-                  {(restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image) && (
-                    <div className="mb-3 rounded-xl overflow-hidden h-36 w-full">
+                  {/* Restaurant Image */}
+                  {spotImg && (
+                    <div className="mb-3 rounded-xl overflow-hidden h-36 w-full relative">
                       <img
-                        src={restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image}
+                        src={spotImg}
                         alt={rest.name}
                         className="w-full h-full object-cover"
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
+                      {isSelected && (
+                        <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
+                          ✓ Added
+                        </span>
+                      )}
                     </div>
                   )}
                   <h3 className="text-xl font-bold text-gray-900 leading-tight mb-1">{rest.name}</h3>
-                  <p className="text-xs text-gray-500 mb-2">ðŸ“ {rest.area}, {rest.city}</p>
+                  <p className="text-xs text-gray-500 mb-2">📍 {rest.area}, {rest.city}</p>
                   <p className="text-xs text-gray-600 line-clamp-1 mb-3"><strong>Food Type:</strong> {rest.food_type}</p>
 
                   <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 mb-4 flex justify-between items-center text-xs">
                     <span className="text-gray-500 font-medium">Price for two:</span>
-                    <span className="font-extrabold text-gray-900">â‚¹{rest.price.toLocaleString()}</span>
+                    <span className="font-extrabold text-gray-900">₹{rest.price.toLocaleString()}</span>
                   </div>
                 </div>
 
-                <div>
-                  {/* Reservations List when Selected */}
-                  {isSelected ? (
-                    <div className="space-y-3 mb-3">
-                      {restBookings.map((b, bIdx) => (
-                        <div key={b.bookingId || b.id || bIdx} className="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2 text-xs relative">
-                          <div className="flex items-center justify-between border-b border-gray-200 pb-1.5">
-                            <span className="text-[10px] font-extrabold text-[#D4B15A] uppercase">
-                              Slot #{bIdx + 1}
-                            </span>
-                            <button
-                              onClick={() => onRemoveRestaurantReservation(b.bookingId || b.id)}
-                              className="text-gray-400 hover:text-rose-500 text-xs cursor-pointer"
-                              title="Cancel this slot"
-                            >
-                              <FontAwesomeIcon icon={faXmark} />
-                            </button>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] uppercase font-bold text-gray-500 flex items-center gap-1">
-                              <FontAwesomeIcon icon={faCalendarDays} className="text-[#D4B15A]" /> Day
-                            </span>
-                            <select
-                              value={b.day || 'Day 1'}
-                              onChange={(e) => onUpdateRestaurantConfig(b.bookingId || b.id, b.seats || travellers, e.target.value, b.timeSlot || 'Dinner')}
-                              className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 outline-none cursor-pointer text-xs"
-                            >
-                              {daysList.map(d => (
-                                <option key={d} value={d}>{d}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] uppercase font-bold text-gray-500 flex items-center gap-1">
-                              <FontAwesomeIcon icon={faClock} className="text-[#D4B15A]" /> Time
-                            </span>
-                            <select
-                              value={b.timeSlot || 'Dinner'}
-                              onChange={(e) => onUpdateRestaurantConfig(b.bookingId || b.id, b.seats || travellers, b.day || 'Day 1', e.target.value)}
-                              className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 outline-none cursor-pointer text-xs"
-                            >
-                              {timeSlots.map(t => (
-                                <option key={t} value={t}>{t}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-gray-100">
-                            <span className="text-[10px] uppercase font-bold text-gray-500 flex items-center gap-1">
-                              <FontAwesomeIcon icon={faUsers} className="text-[#D4B15A]" /> Guests
-                            </span>
-                            <select
-                              value={b.seats || travellers}
-                              onChange={(e) => onUpdateRestaurantConfig(b.bookingId || b.id, parseInt(e.target.value), b.day || 'Day 1', b.timeSlot || 'Dinner')}
-                              className="bg-white border border-gray-200 rounded-lg px-2 py-1 font-bold text-gray-800 outline-none cursor-pointer text-xs"
-                            >
-                              {[1, 2, 3, 4, 5, 6, 8, 10].map(num => (
-                                <option key={num} value={num}>{num} Guests</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Add Another Slot Button */}
-                      <button
-                        onClick={() => onAddRestaurantReservation(rest, `Day ${Math.min(totalDays, restBookings.length + 1)}`, 'Dinner')}
-                        className="w-full bg-amber-500/10 hover:bg-amber-500/20 text-[#D4B15A] font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer border border-[#D4B15A]/30 flex items-center justify-center gap-1"
-                      >
-                        + Book Another Slot at {rest.name}
-                      </button>
-                    </div>
-                  ) : null}
+                <div className="pt-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggle(rest);
+                    }}
+                    className={`w-full font-bold py-2.5 px-4 rounded-xl text-xs transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        : 'bg-[#121619] hover:bg-[#1e2429] text-[#D4B15A] hover:text-white'
+                    }`}
+                  >
+                    {isSelected ? (
+                      <>
+                        <FontAwesomeIcon icon={faCheck} />
+                        <span>Chosen ✓ (Click to Remove)</span>
+                      </>
+                    ) : (
+                      <>
+                        <FontAwesomeIcon icon={faUtensils} />
+                        <span>+ Choose Restaurant</span>
+                      </>
+                    )}
+                  </button>
                 </div>
 
               </div>

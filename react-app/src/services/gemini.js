@@ -1,4 +1,4 @@
-﻿import { checkRateLimit, RATE_LIMITS } from '../utils/rateLimit';
+import { checkRateLimit, RATE_LIMITS } from '../utils/rateLimit';
 import { SYSTEM_PROMPT } from './systemPrompt';
 import { fetchWeather, getPrecautions } from './weather';
 /**
@@ -152,8 +152,8 @@ async function callGemini(userMessage, systemInstruction = null, requireDays = f
       const payload = {
         contents: [{ role: 'user', parts: [{ text: userMessage }] }],
         generationConfig: {
-          temperature: 0.4,
-          maxOutputTokens: 8192,
+          temperature: 0.2,       // Low for deterministic, fact-accurate JSON
+          maxOutputTokens: 16384, // Multi-day itineraries need room to breathe
           responseMimeType: 'application/json',
         },
       };
@@ -414,9 +414,25 @@ async function generateFallbackTripPlan(config) {
   const themes = vibeThemes[tripType] || vibeThemes['Family Trip'];
   const daysArr = [];
 
-  const isVehicleMode = mode && (mode.toLowerCase().includes('self drive') || mode.toLowerCase().includes('personal vehicle') || mode.toLowerCase().includes('bike'));
+  const isVehicleMode = mode && (
+    mode.toLowerCase().includes('car') ||
+    mode.toLowerCase().includes('bus') ||
+    mode.toLowerCase().includes('coach') ||
+    mode.toLowerCase().includes('bike') ||
+    mode.toLowerCase().includes('drive') ||
+    mode.toLowerCase().includes('vehicle') ||
+    mode.toLowerCase().includes('rental') ||
+    mode.toLowerCase().includes('personal') ||
+    mode.toLowerCase().includes('road')
+  );
   const drivingHours = routeInfo ? (routeInfo.durationHours || 0) : 0;
-  const travelDays = (isVehicleMode && drivingHours > 8) ? Math.ceil(drivingHours / 8) : 0;
+  const travelDays = (isVehicleMode && drivingHours >= 8) ? Math.ceil(drivingHours / 8) : 0;
+  const minimumDaysNeeded = (travelDays * 2) + 1;
+  if (travelDays > 0 && totalDays < minimumDaysNeeded) {
+    return {
+      error: `Trip duration too short for road travel! Driving takes ~${routeInfo?.durationDisplay || Math.round(drivingHours) + ' hrs'}, requiring at least ${minimumDaysNeeded} days (${travelDays} days each way + destination stay). Please provide more days or choose Flight/Train.`
+    };
+  }
 
   for (let i = 0; i < totalDays; i++) {
     const d = new Date(start);
@@ -712,16 +728,86 @@ export async function generateTripPlan(config) {
     liveTransport = null,  // DSA live transport from auto-transport endpoint
   } = config;
 
+  // ── Helper: normalize any date string to YYYY-MM-DD ──
+  const normDate = (d) => {
+    if (!d) return '';
+    // Already ISO format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    // Try parsing
+    const parsed = new Date(d);
+    if (!isNaN(parsed)) return parsed.toISOString().split('T')[0];
+    return d;
+  };
+
+  const normFrom = normDate(fromDate);
+  const normTo   = normDate(toDate);
+
+  // Calculate total trip days explicitly so AI never guesses wrong
+  const startD = new Date(normFrom || Date.now());
+  const endD   = new Date(normTo   || Date.now());
+  const computedTotalDays = Math.max(1, Math.round((endD - startD) / 86400000) + 1);
+
+  // ── Fetch real local data for the destination city ──
+  const destCity = (locations[0] || 'Goa').trim();
+  const destKeyLower = destCity.toLowerCase();
+
+  let verifiedSpots   = [];
+  let verifiedHotels  = [];
+
+  try {
+    const BASE = import.meta.env.BASE_URL || '/';
+    const [tpRes, hRes] = await Promise.all([
+      fetch(`${BASE}data/tourist_places.json`).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch(`${BASE}data/hotels.json`).then(r => r.ok ? r.json() : []).catch(() => []),
+    ]);
+
+    verifiedSpots = (tpRes || [])
+      .filter(p => (p.city || '').toLowerCase().includes(destKeyLower) || destKeyLower.includes((p.city || '').toLowerCase()))
+      .slice(0, 10)
+      .map(p => `* ${p.name || p.place} — ${p.description || p.activity || ''} (Entry: ₹${p.entrance_fee_inr || 0}, DSLR: ${p.dslr_allowed || 'Yes'}, Weekly Off: ${p.weekly_off || 'None'})`);
+
+    const tierFilter = (h) => {
+      const star = h.hotel_stars || 3;
+      if (!budget || budget === 'balanced') return star === 4 || star === 3;
+      if (budget === 'budget') return star <= 3;
+      if (budget === 'comfort') return star >= 4;
+      return true;
+    };
+    verifiedHotels = (hRes || [])
+      .filter(h => ((h.city || '').toLowerCase().includes(destKeyLower) || destKeyLower.includes((h.city || '').toLowerCase())) && tierFilter(h))
+      .slice(0, 5)
+      .map(h => `* [hotel_id: ${h.hotel_id || h.id}] ${h.property_name || h.name} — ${h.hotel_stars || 3} Stars, ₹${h.price_per_night_inr || h.price_inr || 3500}/night, ${h.address || h.city}`);
+  } catch (err) {
+    console.warn('Local data pre-fetch failed:', err);
+  }
+
   let userMessage = `Generate a complete travel itinerary with the following inputs:
 
 - destinations: ${locations.join(', ')}
-- from_date: ${fromDate}
-- to_date: ${toDate}
+- from_date: ${normFrom}
+- to_date: ${normTo}
+- total_days: ${computedTotalDays}
 - travel_mode: ${mode}
 - trip_type: ${tripType}
 - budget_tier: ${budget}
 - from_city: ${fromCity}
-- traveller_count: ${travellerCount}`;
+- traveller_count: ${travellerCount}
+
+⚠️ CRITICAL DAY COUNT RULE: You MUST output EXACTLY ${computedTotalDays} day objects in the "days" array. No more, no less. The trip runs from ${normFrom} to ${normTo} inclusive.`;
+
+  // ── Inject verified local tourist spots ──
+  if (verifiedSpots.length > 0) {
+    userMessage += `\n\n- DESTINATION_VERIFIED_SPOTS (real places from database — use these first, supplement with your knowledge):
+${verifiedSpots.join('\n')}
+INSTRUCTION: Prioritize placing these verified spots in the itinerary. You may add MORE real places from your knowledge but DO NOT invent fictional or generic place names.`;
+  }
+
+  // ── Inject verified local hotels ──
+  if (verifiedHotels.length > 0) {
+    userMessage += `\n\n- DESTINATION_VERIFIED_HOTELS (real hotels from database — use hotel_id exactly as given):
+${verifiedHotels.join('\n')}
+INSTRUCTION: Use one of these real hotels for the destination stay days. Copy the hotel_id field exactly. If user has CUSTOMER_SELECTED_HOTEL_STAY_SEQUENCE below, that takes priority.`;
+  }
 
   // --- Geography: Sample intermediate cities from ORS polyline ---
   let routeWaypoints = [];
@@ -742,28 +828,51 @@ export async function generateTripPlan(config) {
   }
 
   // Inject vehicle-specific road trip rules
-  const isVehicleMode = mode && (mode.toLowerCase().includes('self drive') || mode.toLowerCase().includes('personal vehicle') || mode.toLowerCase().includes('bike'));
+  const isVehicleMode = mode && (
+    mode.toLowerCase().includes('car') ||
+    mode.toLowerCase().includes('bus') ||
+    mode.toLowerCase().includes('coach') ||
+    mode.toLowerCase().includes('bike') ||
+    mode.toLowerCase().includes('drive') ||
+    mode.toLowerCase().includes('vehicle') ||
+    mode.toLowerCase().includes('rental') ||
+    mode.toLowerCase().includes('personal') ||
+    mode.toLowerCase().includes('road')
+  );
   if (isVehicleMode && routeInfo) {
     const drivingHours = routeInfo.durationHours || 0;
-    const travelDays = Math.ceil(drivingHours / 10); // Max 10hr/day
-    const startD = new Date(fromDate);
-    const endD = new Date(toDate);
-    const totalTripDays = Math.max(1, Math.ceil((endD - startD) / 86400000) + 1);
+    const travelDays = Math.ceil(drivingHours / 8); // Max 8-10hr/day
+    const totalTripDaysV = computedTotalDays;
     const minimumDaysNeeded = (travelDays * 2) + 1;
-    const tripTooShort = totalTripDays < minimumDaysNeeded;
-    userMessage += `\n\n- ROAD_TRIP_ENFORCEMENT:\nMAXIMUM DRIVE PER DAY: 10 hours. NEVER exceed this in any single day.\nEstimated driving time: ${routeInfo.durationDisplay} (${drivingHours.toFixed(1)} hours).\nDrive days one-way: ${travelDays} (ceil of hours / 10).\nTotal trip days: ${totalTripDays}.\n${tripTooShort ? 'WARNING: Trip is too short! Add warning to trip_summary highlights that user needs at least ' + minimumDaysNeeded + ' days for this route.' : ''}\nSCHEDULE RULE: Day 1 to Day ${travelDays} = DRIVE DAYS (en-route, NOT at destination).\nDay ${travelDays + 1} onwards = sightseeing at destination.\nLast ${travelDays} days = return drive back to ${fromCity}.\nARRIVAL DAY: If arriving after 14:00, only light evening walk + dinner. NO major monuments on arrival day.\nEach drive day: 06:00 depart -> 08:30 breakfast dhaba -> 13:00 lunch dhaba -> 18:30 check-in -> 20:30 dinner.\nFor micro-timings between random highway dhabas on drive days, calculate exactly based on distance / 60 km/hr. Do not hallucinate random travel times.\nONE hotel per city, do NOT change hotels daily at destination. If suggesting an overnight hotel en-route for the drive, label it clearly as "Suggested overnight stop â€” not booked".`;
+    if (drivingHours >= 8 && totalTripDaysV < minimumDaysNeeded) {
+      return {
+        error: `Trip duration too short for road travel! Driving takes ~${routeInfo.durationDisplay || Math.round(drivingHours) + ' hrs'}, requiring at least ${minimumDaysNeeded} days (${travelDays} days each way + destination stay). Please provide more days or choose Flight/Train.`
+      };
+    }
+    const arrivalDay = travelDays + 1;
+    userMessage += `\n\n- ROAD_TRIP_ENFORCEMENT:\nMAXIMUM DRIVE PER DAY: 10 hours. NEVER exceed this in any single day.\nEstimated driving time: ${routeInfo.durationDisplay} (${drivingHours.toFixed(1)} hours).\nDrive days one-way: ${travelDays} (ceil of hours / 8).\nTotal trip days: ${totalTripDaysV}.\nSCHEDULE RULE: Day 1 to Day ${travelDays} = DRIVE DAYS (en-route, NOT at destination).\nDay ${arrivalDay} onwards = sightseeing at destination.\nLast ${travelDays} days = return drive back to ${fromCity}.\nARRIVAL DAY: If arriving after 14:00, only light evening walk + dinner. NO major monuments on arrival day.\nEach drive day: 06:00 depart -> 08:30 breakfast dhaba -> 13:00 lunch dhaba -> 18:30 check-in -> 20:30 dinner.\nFor micro-timings between random highway dhabas on drive days, calculate exactly based on distance / 60 km/hr. Do not hallucinate random travel times.\nONE hotel per city, do NOT change hotels daily at destination. If suggesting an overnight hotel en-route for the drive, label it clearly as "Suggested overnight stop — not booked".\n\nRESTAURANT SHIFT RULE (CRITICAL): The traveller arrives at the destination on Day ${arrivalDay}. If ANY user-selected restaurant or cafe has been assigned to Day 1 through Day ${travelDays} (the drive days), automatically reschedule it to Day ${arrivalDay} or later — never place a Mumbai/destination restaurant on a highway drive day. Do NOT place destination city restaurants on drive days under any circumstances.\n\nHOTEL CHECK-IN TO RESTAURANT GAP RULE: Hotel check-in happens at 14:00 (standard). Any restaurant booking must be scheduled AT LEAST 4 hours after check-in — i.e., no earlier than 18:00 on arrival/check-in days. Never schedule dinner at 14:30 or 15:00 on a check-in day.`;
   }
 
 
-  // Custom Scheduled Tourist Hubs
-  if (customPlaces && customPlaces.length > 0) {
-    const placesDetails = customPlaces.map(p => {
+  // Custom Scheduled Tourist Hubs — FILTER to destination city to prevent cross-city contamination
+  const destCities = locations.map(l => l.toLowerCase().trim());
+  const placeMatchesDest = (p) => {
+    const pCity = (p.city || '').toLowerCase();
+    return destCities.some(dc => pCity.includes(dc) || dc.includes(pCity)) || !p.city;
+  };
+  const filteredCustomPlaces = (customPlaces || []).filter(placeMatchesDest);
+
+  if (filteredCustomPlaces.length > 0) {
+    const placesDetails = filteredCustomPlaces.map(p => {
       const sched = scheduleData[p.id] || { day: 'Day 1', timeSlot: 'Morning' };
-      return `* ${p.name} (City: ${p.city}, Assigned: ${sched.day} ${sched.timeSlot}, Fee: â‚¹${p.entrance_fee_inr}, DSLR Allowed: ${p.dslr_allowed}, Weekly Off: ${p.weekly_off})`;
+      return `* ${p.name} [USER_SELECTED] (City: ${p.city}, Assigned: ${sched.day} ${sched.timeSlot}, Fee: ₹${p.entrance_fee_inr}, DSLR Allowed: ${p.dslr_allowed}, Weekly Off: ${p.weekly_off})`;
     }).join('\n');
 
-    userMessage += `\n\n- CUSTOMER_SELECTED_TOURIST_HUBS_AND_SCHEDULE:\n${placesDetails}`;
-    userMessage += `\n\nCRITICAL INSTRUCTION: You MUST place each selected attraction into the itinerary on its assigned Day and Time Slot. In the tips and precautions section, explicitly highlight the DSLR policies and Weekly Off days for these selected places.`;
+    userMessage += `\n\n- CUSTOMER_SELECTED_TOURIST_HUBS_AND_SCHEDULE (marked [USER_SELECTED]):\n${placesDetails}`;
+    userMessage += `\n\nCRITICAL INSTRUCTION: You MUST place each [USER_SELECTED] attraction into the itinerary on its assigned Day and Time Slot. Mark these items with "source": "user" in the schedule JSON. All other sightseeing items added by you must have "source": "ai". In the tips and precautions section, explicitly highlight the DSLR policies and Weekly Off days for these selected places.`;
+  } else if ((customPlaces || []).length > 0) {
+    // Places were selected but for wrong city — warn AI
+    userMessage += `\n\n- NOTE: User had pre-selected places from a different city. Do NOT include them. Generate appropriate ${destCity} sightseeing instead.`;
   }
 
   // Multi-Hotel Stay Sequence
@@ -772,7 +881,7 @@ export async function generateTripPlan(config) {
     const sorted = [...hotelsList].sort((a, b) => (a.stayOrder || 1) - (b.stayOrder || 1));
     const hotelDetails = sorted.map((h, i) => {
       const name = h.property_name || h.name;
-      return `* Stay #${i + 1}: "${name}" (${h.hotel_stars || 3} Stars, â‚¹${h.price_per_night_inr || h.price_inr || 0}/night, Duration: ${h.nights || 1} Night(s))`;
+      return `* Stay #${i + 1}: "${name}" (${h.hotel_stars || 3} Stars, ₹${h.price_per_night_inr || h.price_inr || 0}/night, Duration: ${h.nights || 1} Night(s))`;
     }).join('\n');
 
     userMessage += `\n\n- CUSTOMER_SELECTED_HOTEL_STAY_SEQUENCE:\n${hotelDetails}`;
@@ -782,7 +891,7 @@ export async function generateTripPlan(config) {
   // Multi-Ride Bookings
   const ridesList = selectedRides.length > 0 ? selectedRides : (selectedRide ? [selectedRide] : []);
   if (ridesList.length > 0) {
-    const rideDetails = ridesList.map(r => `* Vehicle: ${r.vehicle_model} (${r.vehicle_category}, Type: ${r.booking_type}, Price: â‚¹${r.price}, Destination: ${r.tourist_place || r.city})`).join('\n');
+    const rideDetails = ridesList.map(r => `* Vehicle: ${r.vehicle_model} (${r.vehicle_category}, Type: ${r.booking_type}, Price: ₹${r.price}, Destination: ${r.tourist_place || r.city})`).join('\n');
     userMessage += `\n\n- BOOKED_GROUND_TRANSPORT_RIDES:\n${rideDetails}`;
   }
 
@@ -791,38 +900,43 @@ export async function generateTripPlan(config) {
     userMessage += `\n\n- USER_SELECTED_TRANSPORT_PREFERENCES:\n`;
     if (outboundTransport) {
       const obMode = outboundTransport.type || outboundTransport.mode || 'Vehicle';
-      userMessage += `\n* Outbound (Day 1 from ${fromCity}): ${obMode} via ${outboundTransport.operator} (${outboundTransport.depTime} - ${outboundTransport.arrTime}, â‚¹${outboundTransport.price || 0}/person)`;
+      userMessage += `\n* Outbound (Day 1 from ${fromCity}): ${obMode} via ${outboundTransport.operator} (${outboundTransport.depTime} - ${outboundTransport.arrTime}, ₹${outboundTransport.price || 0}/person)`;
     }
     if (returnTransport) {
       const retMode = returnTransport.type || returnTransport.mode || 'Vehicle';
-      userMessage += `\n* Return (Last Day): ${retMode} via ${returnTransport.operator} (${returnTransport.depTime} - ${returnTransport.arrTime}, â‚¹${returnTransport.price || 0}/person)`;
+      userMessage += `\n* Return (Last Day): ${retMode} via ${returnTransport.operator} (${returnTransport.depTime} - ${returnTransport.arrTime}, ₹${returnTransport.price || 0}/person)`;
     }
   }
 
-  // Live DSA Transport Data (from auto-generated itinerary â€” real API data)
+  // Live DSA Transport Data (from auto-generated itinerary — real API data)
   if (liveTransport && (liveTransport.outbound || liveTransport.return)) {
     const src = liveTransport.source || 'DSA';
-    userMessage += `\n\n- LIVE_DSA_TRANSPORT_DATA (from ${src} live API â€” USE THESE EXACT DETAILS):`;
+    userMessage += `\n\n- LIVE_DSA_TRANSPORT_DATA (from ${src} live API — USE THESE EXACT DETAILS):`;
     if (liveTransport.outbound) {
       const o = liveTransport.outbound;
-      userMessage += `\n* Outbound Flight/Bus (Day 1 from ${fromCity}): ${o.operator} ${o.code || ''}, Departs ${o.depTime}, Arrives ${o.arrTime}, Duration: ${o.duration}, Fare: â‚¹${o.price}/person, Baggage: ${o.baggage || 'N/A'}`;
+      userMessage += `\n* Outbound Flight/Bus (Day 1 from ${fromCity}): ${o.operator} ${o.code || ''}, Departs ${o.depTime}, Arrives ${o.arrTime}, Duration: ${o.duration}, Fare: ₹${o.price}/person, Baggage: ${o.baggage || 'N/A'}`;
     }
     if (liveTransport.return) {
       const r = liveTransport.return;
-      userMessage += `\n* Return Flight/Bus (Last Day): ${r.operator} ${r.code || ''}, Departs ${r.depTime}, Arrives ${r.arrTime}, Duration: ${r.duration}, Fare: â‚¹${r.price}/person, Baggage: ${r.baggage || 'N/A'}`;
+      userMessage += `\n* Return Flight/Bus (Last Day): ${r.operator} ${r.code || ''}, Departs ${r.depTime}, Arrives ${r.arrTime}, Duration: ${r.duration}, Fare: ₹${r.price}/person, Baggage: ${r.baggage || 'N/A'}`;
     }
     userMessage += `\n\nCRITICAL: Use the above LIVE DSA transport details verbatim in intercity_transport section. Set operator, dep_time, arr_time, duration, cost_inr from these values. Do NOT invent or use synthetic flight/bus details.`;
   }
 
-  // Scheduled Dining (Cafes & Restaurants)
+  // Scheduled Dining (Cafes & Restaurants) — use safe fallbacks for missing day/timeSlot
   if (selectedCafes.length > 0 || selectedRestaurants.length > 0) {
-    const cafesText = selectedCafes.map(c => `* Cafe: ${c.name} (${c.seats} guests, Assigned: ${c.day || 'Day 1'} ${c.timeSlot || 'Lunch'}, Rate for two: â‚¹${c.rate_for_two})`).join('\n');
-    const restText = selectedRestaurants.map(r => `* Restaurant: ${r.name} (${r.seats} guests, Assigned: ${r.day || 'Day 1'} ${r.timeSlot || 'Dinner'}, Price for two: â‚¹${r.price})`).join('\n');
-    userMessage += `\n\n- RESERVED_DINING_SCHEDULE:\n${cafesText}\n${restText}`;
-    userMessage += `\n\nCRITICAL INSTRUCTION: Place the reserved cafes and restaurants into the itinerary on their requested Day and Time Slot (Meal time).`;
+    const cafesText = selectedCafes.map(c => `* Cafe: ${c.name} (Assigned: ${c.day || 'Any Day'} ${c.timeSlot || 'Lunch'}, Rate for two: ₹${c.rate_for_two || c.price || 500}) [USER_SELECTED]`).join('\n');
+    const restText  = selectedRestaurants.map(r => `* Restaurant: ${r.name} (Assigned: ${r.day || 'Any Day'} ${r.timeSlot || 'Dinner'}, Price for two: ₹${r.price || r.rate_for_two || 500}) [USER_SELECTED]`).join('\n');
+    userMessage += `\n\n- CUSTOMER_SELECTED_DINING (marked [USER_SELECTED]):\n${cafesText}\n${restText}`;
+    userMessage += `\n\nCRITICAL INSTRUCTION: Place these [USER_SELECTED] restaurants and cafes into the itinerary. Mark them with "source": "user" in the schedule JSON. If no specific day is given, distribute them across destination days at appropriate meal times.`;
   }
 
-  userMessage += `\n\nCRITICAL BUDGET INSTRUCTION: You MUST calculate estimated_budget_inr and trip_summary.total_cost_inr to reflect the REAL total sum of all user-selected transport, hotels, rides, dining, and sightseeing fees. Do not output a low default estimate.`;
+  userMessage += `\n\nCRITICAL BUDGET INSTRUCTION: You MUST calculate estimated_budget_inr and trip_summary.total_cost_inr to reflect the REAL total sum of all user-selected transport, hotels, rides, dining, and sightseeing fees. Do not output a low default estimate.
+
+FINAL REMINDER — "source" field in every schedule item:
+- "source": "user" → place/restaurant explicitly chosen by the user (from CUSTOMER_SELECTED lists above)
+- "source": "ai"   → everything else added by you to complete the itinerary
+This field MUST appear on every schedule item. Never omit it.`;
 
   let parsed = null;
   try {
