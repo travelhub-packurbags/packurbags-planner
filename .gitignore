@@ -15,12 +15,12 @@ backend/test_*.js
 backend/find_*.js
 backend/temp_hotels.json
 
-# Local / temporary root uploads
+# Local / temporary root uploads (anchored to root only, NOT react-app/src/assets/)
 desktop.ini
 *.pdf
 review*.jpeg
 review*.jpg
-files/
-gateway_india_bg.jpg
-marine_drive_bg.jpg
+/files/
+/gateway_india_bg.jpg
+/marine_drive_bg.jpg
 
