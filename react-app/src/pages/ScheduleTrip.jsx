@@ -283,9 +283,9 @@ export default function ScheduleTrip() {
     // Safety rule: max 8-10 hours of driving possible per day
     if (drivingHours >= 8) {
       const travelDays = Math.ceil(drivingHours / 8);
-      const minDays = (travelDays * 2) + 1; // Round-trip transit days + 1 day at destination
+      const minDays = (travelDays * 2) + 2; // Round-trip transit days + min 2 days at destination
 
-      if (totalDays < minDays) {
+      if (totalDays <= minDays) {
         return {
           ok: false,
           minDays,

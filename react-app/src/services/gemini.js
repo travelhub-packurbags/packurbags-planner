@@ -427,10 +427,10 @@ async function generateFallbackTripPlan(config) {
   );
   const drivingHours = routeInfo ? (routeInfo.durationHours || 0) : 0;
   const travelDays = (isVehicleMode && drivingHours >= 8) ? Math.ceil(drivingHours / 8) : 0;
-  const minimumDaysNeeded = (travelDays * 2) + 1;
-  if (travelDays > 0 && totalDays < minimumDaysNeeded) {
+  const minimumDaysNeeded = (travelDays * 2) + 2; // Round-trip transit + min 2 days at destination
+  if (travelDays > 0 && totalDays <= minimumDaysNeeded) {
     return {
-      error: `Trip duration too short for road travel! Driving takes ~${routeInfo?.durationDisplay || Math.round(drivingHours) + ' hrs'}, requiring at least ${minimumDaysNeeded} days (${travelDays} days each way + destination stay). Please provide more days or choose Flight/Train.`
+      error: `Trip duration too short for road travel! Driving takes ~${routeInfo?.durationDisplay || Math.round(drivingHours) + ' hrs'}, requiring at least ${minimumDaysNeeded} days (${travelDays} days each way + min 2 days at destination). Please provide more days or choose Flight/Train.`
     };
   }
 
