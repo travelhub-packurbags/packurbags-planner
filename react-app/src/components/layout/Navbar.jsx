@@ -1,16 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faXmark, faUser } from '@fortawesome/free-solid-svg-icons';
+import { faBars, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SignInButton, UserButton, SignedIn, SignedOut } from '@clerk/clerk-react';
-import useAppStore from '../../stores/useAppStore';
 import packurbagIcon from '../../assets/packurbag_icon.png';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { user, setUser, openLoginModal } = useAppStore();
 
   // Only Home (external) and AI Trip Planner (internal)
   const links = [
@@ -63,34 +60,6 @@ export default function Navbar() {
         </div>
 
         <div className="flex items-center gap-3">
-          {user ? (
-            <div className="flex items-center gap-3">
-              <span className="text-white text-sm font-medium">Hello, {user.name}</span>
-              <button
-                onClick={() => setUser(null)}
-                className="bg-white/10 hover:bg-white/20 text-white text-xs border border-white/20 rounded-full px-3 py-1.5 font-medium transition-all cursor-pointer"
-              >
-                Logout
-              </button>
-            </div>
-          ) : (
-            <>
-              <SignedOut>
-                <button
-                  onClick={openLoginModal}
-                  className="flex items-center gap-2 bg-[#D4B15A] hover:bg-[#b89542] text-white px-5 py-2 rounded-full font-medium transition-colors text-sm cursor-pointer"
-                >
-                  <FontAwesomeIcon icon={faUser} />
-                  Login / Sign Up
-                </button>
-              </SignedOut>
-
-              <SignedIn>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
-            </>
-          )}
-
           {/* Mobile toggle */}
           <button
             className="md:hidden text-white text-xl p-2"
