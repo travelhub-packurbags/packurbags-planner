@@ -9,4 +9,7 @@ export default defineConfig({
     react(),
   ],
   base: '/',
+  build: {
+    assetsDir: 'trip-planner-assets',  // unique prefix - won't clash with main site's /assets/
+  },
 })
