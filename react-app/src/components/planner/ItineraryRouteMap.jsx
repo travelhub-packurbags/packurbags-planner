@@ -56,32 +56,32 @@ export default function ItineraryRouteMap({ plan, fromCity, routeInfo, isVehicle
     if (!onCaptureSnippet) return;
     setIsCapturing(true);
     try {
-      const STATIC_MAPS_KEY = import.meta.env.VITE_GOOGLE_STATIC_MAPS_KEY || import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
       const validMarkers = markers.filter(m => m.lat && m.lng);
 
       let pathParam = '';
       if (polyline.length > 1) {
-        const step = Math.max(1, Math.floor(polyline.length / 100));
+        const step    = Math.max(1, Math.floor(polyline.length / 100));
         const sampled = polyline.filter((_, i) => i % step === 0);
         pathParam = `&path=color:0x7c3aedff%7Cweight:4%7C${sampled.map(c => `${c[0]},${c[1]}`).join('%7C')}`;
       }
 
-      // Group markers
       const originMarkers = validMarkers.filter(m => m.type === 'origin');
-      const hotelMarkers = validMarkers.filter(m => m.type === 'hotel');
-      const otherMarkers = validMarkers.filter(m => m.type !== 'origin' && m.type !== 'hotel');
+      const hotelMarkers  = validMarkers.filter(m => m.type === 'hotel');
+      const otherMarkers  = validMarkers.filter(m => m.type !== 'origin' && m.type !== 'hotel');
 
       const oParam = originMarkers.map(m => `&markers=color:green%7Clabel:O%7C${m.lat},${m.lng}`).join('');
       const hParam = hotelMarkers.slice(0,5).map(m => `&markers=color:blue%7Clabel:H%7C${m.lat},${m.lng}`).join('');
       const pParam = otherMarkers.slice(0,5).map(m => `&markers=color:red%7Csize:small%7C${m.lat},${m.lng}`).join('');
-      
       const markersParam = oParam + hParam + pParam;
 
-      const midMarker = validMarkers[Math.floor(validMarkers.length / 2)] || { lat: 20.5937, lng: 78.9629 };
+      const midMarker  = validMarkers[Math.floor(validMarkers.length / 2)] || { lat: 20.5937, lng: 78.9629 };
       const centerParam = `center=${midMarker.lat},${midMarker.lng}`;
       const zoom = validMarkers.length > 2 ? 6 : validMarkers.length > 1 ? 7 : 12;
 
-      const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?${centerParam}&zoom=${zoom}&size=800x450&maptype=roadmap&scale=2${markersParam}${pathParam}&key=${STATIC_MAPS_KEY}`;
+      // Backend proxy injects the key — key never exposed in browser
+      const rawParams = `${centerParam}&zoom=${zoom}&size=800x450&maptype=roadmap&scale=2${markersParam}${pathParam}`;
+      const staticUrl = `${BACKEND_URL}/api/planner/static-map?params=${encodeURIComponent(rawParams)}`;
 
       onCaptureSnippet({
         image: staticUrl,

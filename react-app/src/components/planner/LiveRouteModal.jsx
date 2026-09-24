@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -408,35 +408,33 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
     if (!onCaptureSnippet) return;
     setIsCapturing(true);
     try {
-      const STATIC_MAPS_KEY = import.meta.env.VITE_GOOGLE_STATIC_MAPS_KEY || import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
+      const BACKEND_URL_LRM = import.meta.env.VITE_BACKEND_URL || '';
 
       let pathParam = '';
       if (routeInfo?.polylineCoords && routeInfo.polylineCoords.length > 0) {
-        const coords = routeInfo.polylineCoords;
-        const step = Math.max(1, Math.floor(coords.length / 100));
+        const coords  = routeInfo.polylineCoords;
+        const step    = Math.max(1, Math.floor(coords.length / 100));
         const sampled = coords.filter((_, i) => i % step === 0);
         pathParam = `&path=color:0x4f46e5ff%7Cweight:4%7C${sampled.map(c => `${c[0]},${c[1]}`).join('%7C')}`;
       } else if (stops.length >= 2) {
         pathParam = `&path=color:0x4f46e5ff%7Cweight:4%7C${stops.map(s => `${s.lat},${s.lng}`).join('%7C')}`;
       }
 
-      // Stop markers
-      const stopMarkers = stops.map((s, i) =>
+      const stopMarkers  = stops.map((s, i) =>
         `&markers=color:red%7Clabel:${String.fromCharCode(65 + i)}%7C${s.lat},${s.lng}`
       ).join('');
-
-      // Hotel markers (cap at 5 so URL doesn't get too long)
-      const hotelMarkers = hotels.slice(0, 5).map(h => 
+      const hotelMarkers = hotels.slice(0, 5).map(h =>
         `&markers=color:blue%7Clabel:H%7C${h.lat || h.latitude},${h.lng || h.longitude}`
       ).join('');
-
       const markersParam = stopMarkers + hotelMarkers;
 
-      const midStop = stops[Math.floor(stops.length / 2)] || { lat: 20.5937, lng: 78.9629 };
+      const midStop     = stops[Math.floor(stops.length / 2)] || { lat: 20.5937, lng: 78.9629 };
       const centerParam = `center=${midStop.lat},${midStop.lng}`;
-      const zoom = stops.length > 1 ? 6 : 10;
+      const zoom        = stops.length > 1 ? 6 : 10;
 
-      const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?${centerParam}&zoom=${zoom}&size=800x450&maptype=roadmap&scale=2${markersParam}${pathParam}&key=${STATIC_MAPS_KEY}`;
+      // Backend proxy injects the key — key never exposed in browser
+      const rawParams = `${centerParam}&zoom=${zoom}&size=800x450&maptype=roadmap&scale=2${markersParam}${pathParam}`;
+      const staticUrl = `${BACKEND_URL_LRM}/api/planner/static-map?params=${encodeURIComponent(rawParams)}`;
 
       onCaptureSnippet({
         image: staticUrl,

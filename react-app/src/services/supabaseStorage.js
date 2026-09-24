@@ -1,15 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Supabase integration has been removed — storage is localStorage-only.
+// No VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in the browser bundle.
 
 // 15 days in milliseconds
 export const FIFTEEN_DAYS_MS = 15 * 24 * 60 * 60 * 1000;
 
-// Initialize Supabase if credentials are provided
-export const supabase = (SUPABASE_URL && SUPABASE_ANON_KEY)
-  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-  : null;
+// Supabase client is permanently null — all persistence via localStorage
+export const supabase = null;
+
 
 /**
  * Save an individual selected item image with 15-day TTL

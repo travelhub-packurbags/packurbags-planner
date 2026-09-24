@@ -302,6 +302,178 @@ app.post('/v1/planner/route', async (req, res) => {
   }
 });
 
+// ============================================================
+// ORS Geocoding proxy — GET /api/planner/ors/geocode
+// qs: text (required), type=city|place (optional, city adds layer filter)
+// ============================================================
+app.get('/api/planner/ors/geocode', async (req, res) => {
+  const key = getOrsKey();
+  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'ORS key not configured.' });
+  const { text, type } = req.query;
+  if (!text?.trim()) return res.status(400).json({ error: 'text query param required' });
+  try {
+    const url = new URL(`${ORS_BASE}/geocode/search`);
+    url.searchParams.set('api_key', key);
+    const t = text.trim();
+    url.searchParams.set('text', t.includes('India') ? t : `${t}, India`);
+    url.searchParams.set('size', '1');
+    url.searchParams.set('boundary.country', 'IND');
+    if (type === 'city') url.searchParams.set('layers', 'locality,region');
+    const response = await axios.get(url.toString(), { timeout: 8000 });
+    res.json(response.data);
+  } catch (err) {
+    console.error('[api/planner/ors/geocode]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
+// ============================================================
+// ORS POIs proxy — POST /api/planner/ors/pois
+// body: { request: <ORS POI request object> }
+// ============================================================
+app.post('/api/planner/ors/pois', async (req, res) => {
+  const key = getOrsKey();
+  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'ORS key not configured.' });
+  const { request } = req.body;
+  if (!request) return res.status(400).json({ error: 'request body required' });
+  try {
+    const response = await axios.post(
+      `${ORS_BASE}/pois`,
+      { request },
+      { headers: { 'Authorization': key, 'Content-Type': 'application/json' }, timeout: 10000 }
+    );
+    res.json(response.data);
+  } catch (err) {
+    console.error('[api/planner/ors/pois]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
+// ============================================================
+// Weather proxy — GET /api/planner/weather
+// qs: city, lat, lng (city OR lat+lng required)
+// Tries XWeather first, falls back to OpenWeatherMap
+// ============================================================
+app.get('/api/planner/weather', async (req, res) => {
+  const owmKey  = process.env.PLANNER_OPENWEATHER_KEY || process.env.OPENWEATHER_KEY || '';
+  const xwId    = process.env.XWEATHER_CLIENT_ID || '';
+  const xwSec   = process.env.XWEATHER_CLIENT_SECRET || '';
+  const { city, lat, lng } = req.query;
+  if (!city && (!lat || !lng)) return res.status(400).json({ error: 'Provide city or lat+lng' });
+
+  // Try XWeather first
+  if (xwId && xwSec && xwId.length > 5) {
+    try {
+      const queryLoc = (lat && lng) ? `${lat},${lng}` : encodeURIComponent(city);
+      const xwRes = await axios.get(
+        `https://data.api.xweather.com/forecasts/${queryLoc}?client_id=${xwId}&client_secret=${xwSec}`,
+        { timeout: 10000 }
+      );
+      if (xwRes.data?.success) return res.json({ source: 'xweather', data: xwRes.data });
+    } catch (err) {
+      console.warn('[weather/xweather]', err.message);
+    }
+  }
+
+  // Fall back to OpenWeatherMap
+  if (!owmKey) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Weather API not configured.' });
+  try {
+    const base = 'https://api.openweathermap.org/data/2.5';
+    const url = (lat && lng)
+      ? `${base}/forecast?lat=${lat}&lon=${lng}&units=metric&appid=${owmKey}`
+      : `${base}/forecast?q=${encodeURIComponent(city)}&units=metric&appid=${owmKey}`;
+    const owmRes = await axios.get(url, { timeout: 10000 });
+    res.json({ source: 'openweather', data: owmRes.data });
+  } catch (err) {
+    console.error('[weather/owm]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
+// ============================================================
+// AQI proxy — GET /api/planner/weather/aqi?lat=&lng=
+// ============================================================
+app.get('/api/planner/weather/aqi', async (req, res) => {
+  const owmKey = process.env.PLANNER_OPENWEATHER_KEY || process.env.OPENWEATHER_KEY || '';
+  if (!owmKey) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Weather API not configured.' });
+  const { lat, lng } = req.query;
+  if (!lat || !lng) return res.status(400).json({ error: 'lat and lng required' });
+  try {
+    const owmRes = await axios.get(
+      `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lng}&appid=${owmKey}`,
+      { timeout: 8000 }
+    );
+    res.json(owmRes.data);
+  } catch (err) {
+    console.error('[weather/aqi]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
+// ============================================================
+// Google Static Maps proxy — GET /api/planner/static-map?params=<urlencoded_query>
+// The key is injected server-side; never exposed to the browser.
+// ============================================================
+app.get('/api/planner/static-map', async (req, res) => {
+  const key = getGoogleKey();
+  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Google key not configured.' });
+  const { params } = req.query;
+  if (!params) return res.status(400).json({ error: 'params required' });
+  try {
+    const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?${params}&key=${key}`;
+    const response = await axios.get(staticUrl, { responseType: 'arraybuffer', timeout: 12000 });
+    res.set('Content-Type', response.headers['content-type'] || 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(response.data);
+  } catch (err) {
+    console.error('[static-map]', err.message);
+    res.status(503).send('');
+  }
+});
+
+// ============================================================
+// Google Places Photo proxy — GET /api/planner/places/photo?ref=<photoRef>&maxH=500
+// Fetches the actual image bytes and streams them; key never in browser URL.
+// ============================================================
+app.get('/api/planner/places/photo', async (req, res) => {
+  const key = getGoogleKey();
+  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Google key not configured.' });
+  const { ref, maxH = 500 } = req.query;
+  if (!ref) return res.status(400).json({ error: 'ref required' });
+  try {
+    const photoUrl = `https://places.googleapis.com/v1/${ref}/media?maxHeightPx=${maxH}&key=${key}`;
+    const response = await axios.get(photoUrl, { responseType: 'arraybuffer', timeout: 12000, maxRedirects: 5 });
+    res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=604800'); // 7 days
+    res.send(response.data);
+  } catch (err) {
+    console.error('[places/photo]', err.message);
+    res.status(503).send('');
+  }
+});
+
+// ============================================================
+// Serper image search proxy — GET /api/planner/serper/images?q=<query>
+// ============================================================
+app.get('/api/planner/serper/images', async (req, res) => {
+  const serperKey = process.env.PLANNER_SERPER_API_KEY || process.env.SERPER_API_KEY || '';
+  if (!serperKey) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Serper API not configured.' });
+  const { q } = req.query;
+  if (!q) return res.status(400).json({ error: 'q query param required' });
+  try {
+    const response = await axios.post(
+      'https://google.serper.dev/images',
+      { q: q.trim(), num: 5 },
+      { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 10000 }
+    );
+    res.json(response.data);
+  } catch (err) {
+    console.error('[serper/images]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
+
 
 async function generatePDF(booking) {
   const pdfDoc = await PDFDocument.create();

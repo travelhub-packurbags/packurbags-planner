@@ -1,26 +1,7 @@
-﻿import { toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 
-let GOOGLE_PLACES_KEY = import.meta.env.VITE_GOOGLE_PLACES_KEY || "";
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-
-// Module-level cache for fetchGoogleAttractions.
-// Prevents duplicate API calls from React StrictMode's double-invoke.
-const attractionsCache = new Map();
-
-export async function getGoogleKey() {
-  if (GOOGLE_PLACES_KEY) return GOOGLE_PLACES_KEY;
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/config/maps`);
-    const data = await res.json();
-    GOOGLE_PLACES_KEY = data.googlePlacesKey;
-    return GOOGLE_PLACES_KEY;
-  } catch (err) {
-    console.error("Failed to fetch maps config", err);
-    return "";
-  }
-}
-
-const AUTOCOMPLETE_URL = "https://places.googleapis.com/v1/places:autocomplete";
+// All Google Places calls go through backend proxy — no key in the browser bundle.
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 let cachedLocalData = null;
 
@@ -182,103 +163,64 @@ export async function searchPlaces(query) {
   if (!query || !query.trim()) return [];
 
   try {
-    const key = await getGoogleKey();
-    if (!key) throw new Error("Missing Google Places API Key");
-
-    const res = await fetch(AUTOCOMPLETE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': key,
-        'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
-      },
-      body: JSON.stringify({
-        input: query.trim(),
-        includedRegionCodes: ['in']
-      })
-    });
-
-    if (!res.ok) {
-      throw new Error(`Google Places API returned status ${res.status}`);
-    }
-
+    const res = await fetch(`${BACKEND_URL}/v1/planner/places/search?q=${encodeURIComponent(query.trim())}`);
+    if (!res.ok) throw new Error(`Backend places search returned ${res.status}`);
     const data = await res.json();
-    const suggestions = data.suggestions || [];
+    if (data.code === 'PLANNER_UNAVAILABLE') throw new Error(data.message);
 
-    if (suggestions.length === 0) {
-      return searchLocalDataset(query);
-    }
+    const suggestions = data.suggestions || [];
+    if (suggestions.length === 0) return searchLocalDataset(query);
 
     return suggestions.map(s => {
-      const pred = s.placePrediction || {};
+      const pred    = s.placePrediction || {};
       const textVal = pred.text?.text || (typeof pred.text === 'string' ? pred.text : 'Unknown Place');
       const mainText = pred.structuredFormat?.mainText?.text || textVal;
       return {
-        placeId: pred.placeId,
-        text: textVal, // Full text for display in dropdown
-        displayName: mainText, // Short name for the input field
-        source: 'google'
+        placeId:     pred.placeId,
+        text:        textVal,
+        displayName: mainText,
+        source:      'google',
       };
     }).filter(item => item.placeId);
 
   } catch (err) {
-    console.error("Google API failed, falling back to local dataset:", err.message || err);
-    toast.warn("Using offline data. Some suggestions may be limited", { toastId: 'google-fallback-warn' });
+    console.error('Places search failed, falling back to local dataset:', err.message || err);
+    toast.warn('Using offline data. Some suggestions may be limited', { toastId: 'google-fallback-warn' });
     return searchLocalDataset(query);
   }
 }
+
 
 /**
  * Get detailed place information by placeId
  */
 export async function getPlaceDetails(placeId) {
   if (!placeId) return null;
-
-  if (placeId.startsWith('local_')) {
-    return getLocalPlaceDetails(placeId);
-  }
+  if (placeId.startsWith('local_')) return getLocalPlaceDetails(placeId);
 
   try {
-    const key = await getGoogleKey();
-    if (!key) throw new Error("Missing Google Places API Key");
-
-    const url = `https://places.googleapis.com/v1/places/${placeId}`;
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'X-Goog-Api-Key': key,
-        'X-Goog-FieldMask': 'id,displayName,location,rating,formattedAddress,websiteUri,photos'
-      }
-    });
-
-    if (!res.ok) {
-      throw new Error(`Google Place Details API returned status ${res.status}`);
-    }
-
+    const res = await fetch(`${BACKEND_URL}/v1/planner/places/${encodeURIComponent(placeId)}`);
+    if (!res.ok) throw new Error(`Backend place details returned ${res.status}`);
     const data = await res.json();
-    const name = data.displayName?.text || 'Attraction';
-    const lat = data.location?.latitude || 0;
-    const lng = data.location?.longitude || 0;
+    if (data.code === 'PLANNER_UNAVAILABLE') throw new Error(data.message);
 
+    const name = data.displayName?.text || 'Attraction';
+    const lat  = data.location?.latitude  || 0;
+    const lng  = data.location?.longitude || 0;
     return {
-      id: data.id || placeId,
-      placeId: data.id || placeId,
-      name,
-      displayName: name,
-      lat,
-      lng,
+      id: data.id || placeId, placeId: data.id || placeId,
+      name, displayName: name, lat, lng,
       location: data.location || { latitude: lat, longitude: lng },
       rating: data.rating || 4.5,
       formattedAddress: data.formattedAddress || '',
       address: data.formattedAddress || '',
       websiteUri: data.websiteUri || null,
       photos: data.photos || [],
-      source: 'google'
+      source: 'google',
     };
-
   } catch (err) {
-    console.error("Google API failed, falling back to local dataset:", err.message || err);
-    toast.warn("Using offline data. Some suggestions may be limited", { toastId: 'google-details-fallback-warn' });
+    console.error('Place details failed, falling back to local dataset:', err.message || err);
+    toast.warn('Using offline data. Some suggestions may be limited', { toastId: 'google-details-fallback-warn' });
     return getLocalPlaceDetails(placeId);
   }
 }
@@ -455,26 +397,12 @@ export async function geocodeCity(cityName) {
     return EXACT_LANDMARKS[exactMatch];
   }
 
-  // Fallback to Google Text Search API (more accurate for full address strings than Autocomplete)
+  // Fallback to backend Google Text Search proxy (more accurate for full address strings)
   try {
-    const key = await getGoogleKey();
-    if (!key) throw new Error("Missing Google API Key");
-
-    const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': key,
-        'X-Goog-FieldMask': 'places.location'
-      },
-      body: JSON.stringify({
-        textQuery: cityName
-      })
-    });
-
+    const res = await fetch(`${BACKEND_URL}/v1/planner/geocode?city=${encodeURIComponent(cityName)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.places && data.places.length > 0) {
+      if (!data.code && data.places && data.places.length > 0) {
         const loc = data.places[0].location;
         if (loc && loc.latitude && loc.longitude) {
           return { lat: loc.latitude, lng: loc.longitude };
@@ -482,10 +410,11 @@ export async function geocodeCity(cityName) {
       }
     }
   } catch (err) {
-    console.error("Geocoding failed for:", cityName, err);
+    console.error('Geocoding failed for:', cityName, err);
   }
 
   return null;
+
 }
 
 /**
@@ -582,45 +511,33 @@ export function fetchGoogleAttractions(cityName) {
   if (attractionsCache.has(cityName)) return attractionsCache.get(cityName);
 
   const p = (async () => {
-    const key = await getGoogleKey();
-    if (!key) return [];
+    try {
+      const res = await fetch(`${BACKEND_URL}/v1/planner/places/attractions?city=${encodeURIComponent(cityName)}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (data.code === 'PLANNER_UNAVAILABLE' || !data.places) return [];
 
-    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Goog-Api-Key': key,
-        // No places.photos â€” tourist spot images come from Wikipedia
-        'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.formattedAddress,places.editorialSummary,places.location,places.primaryType',
-      },
-      body: JSON.stringify({ textQuery: `top tourist attractions in ${cityName}`, languageCode: 'en' }),
-    });
-
-    if (!res.ok) {
-      console.error(`[fetchGoogleAttractions] HTTP ${res.status} for "${cityName}"`);
+      return data.places.slice(0, 10).map((place, idx) => ({
+        id:                   `google_p_${place.id || idx}`,
+        name:                 place.displayName?.text || 'Attraction',
+        city:                 cityName,
+        state:                cityName,
+        zone:                 'Unknown',
+        type:                 place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Tourist Hub',
+        google_review_rating: place.rating || 4.5,
+        entrance_fee_inr:     0,
+        weekly_off:           'None',
+        dslr_allowed:         'Yes',
+        description:          place.editorialSummary?.text || `A popular tourist attraction in ${cityName}.`,
+        lat:                  place.location?.latitude,
+        lng:                  place.location?.longitude,
+        image:                null,
+        source:               'google',
+      }));
+    } catch (err) {
+      console.error(`[fetchGoogleAttractions] Failed for "${cityName}":`, err.message);
       return [];
     }
-
-    const data = await res.json();
-    if (!data.places) return [];
-
-    return data.places.slice(0, 10).map((p, idx) => ({
-      id: `google_p_${p.id || idx}`,
-      name: p.displayName?.text || 'Attraction',
-      city: cityName,
-      state: cityName,
-      zone: 'Unknown',
-      type: p.primaryType ? p.primaryType.replace(/_/g, ' ') : 'Tourist Hub',
-      google_review_rating: p.rating || 4.5,
-      entrance_fee_inr: 0,
-      weekly_off: 'None',
-      dslr_allowed: 'Yes',
-      description: p.editorialSummary?.text || `A beautiful popular tourist attraction located in ${cityName}.`,
-      lat: p.location?.latitude,
-      lng: p.location?.longitude,
-      image: null,   // fetched separately via Wikipedia
-      source: 'google',
-    }));
   })();
 
   // Store Promise immediately â€” before any await runs â€” so duplicate calls share it

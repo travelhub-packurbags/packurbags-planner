@@ -1,31 +1,25 @@
-// ORS Places Service — fallback tourist place lookup for cities not in local dataset.
-// Uses ORS Geocoding + POI endpoints. Max 2 places enforced at API level.
-// No Google Places calls here — Google is already used upstream in Step1Places.
+// ORS Places Service — geocoding + POI lookup via backend proxy.
+// No ORS API key in the browser bundle.
 
-const ORS_KEY = import.meta.env.VITE_ORS_KEY || '';
-const ORS_BASE = 'https://api.openrouteservice.org';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 // Tourist-relevant ORS POI category IDs
-// 160=Tourism, 162=Attraction, 150=Historic, 268=Historic/Fort, 267=Museum, 191=Museum, 344=Viewpoint, 380=Natural/Beach, 390=Leisure/Park, 530=Sport/Adventure, 550=Place of Worship
 const TOURIST_CATEGORY_IDS = [160, 162, 150, 268, 267, 191, 344, 380, 390, 530, 550];
 
 /**
- * Geocode a city name to {lat, lng} via ORS Geocoding API.
- * Scoped to India to avoid false matches. Returns null on failure.
+ * Geocode a city name to {lat, lng} via the backend ORS proxy.
+ * Scoped to India. Returns null on failure.
  */
 export async function geocodeCityORS(cityName) {
-  if (!ORS_KEY || !cityName?.trim()) return null;
+  if (!cityName?.trim()) return null;
   try {
-    const url = new URL(`${ORS_BASE}/geocode/search`);
-    url.searchParams.set('api_key', ORS_KEY);
-    url.searchParams.set('text', `${cityName.trim()}, India`);
-    url.searchParams.set('size', '1');
-    url.searchParams.set('layers', 'locality,region');
-    url.searchParams.set('boundary.country', 'IND');
-
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(
+      `${BACKEND_URL}/api/planner/ors/geocode?text=${encodeURIComponent(cityName.trim())}&type=city`,
+      { signal: AbortSignal.timeout(7000) }
+    );
     if (!res.ok) return null;
     const data = await res.json();
+    if (data.code === 'PLANNER_UNAVAILABLE') return null;
     const feature = data.features?.[0];
     if (!feature) return null;
     const [lng, lat] = feature.geometry.coordinates;
@@ -37,25 +31,22 @@ export async function geocodeCityORS(cityName) {
 }
 
 /**
- * Geocode a restaurant or specific POI name/address via ORS Geocoding API.
- * Falls back to Nominatim if ORS fails or returns no match.
+ * Geocode a restaurant or specific POI name/address via the backend ORS proxy.
+ * Falls back to Nominatim (public API, no key needed) if backend fails.
  */
 export async function geocodePlaceORS(query) {
   if (!query?.trim()) return null;
   const cleaned = query.trim();
 
-  // 1. Try ORS Geocoding API
-  if (ORS_KEY) {
-    try {
-      const url = new URL(`${ORS_BASE}/geocode/search`);
-      url.searchParams.set('api_key', ORS_KEY);
-      url.searchParams.set('text', cleaned.includes('India') ? cleaned : `${cleaned}, India`);
-      url.searchParams.set('size', '1');
-      url.searchParams.set('boundary.country', 'IND');
-
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
-      if (res.ok) {
-        const data = await res.json();
+  // 1. Try backend ORS proxy
+  try {
+    const res = await fetch(
+      `${BACKEND_URL}/api/planner/ors/geocode?text=${encodeURIComponent(cleaned)}`,
+      { signal: AbortSignal.timeout(7000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (!data.code) {
         const feature = data.features?.[0];
         if (feature?.geometry?.coordinates) {
           const [lng, lat] = feature.geometry.coordinates;
@@ -64,12 +55,12 @@ export async function geocodePlaceORS(query) {
           }
         }
       }
-    } catch (e) {
-      console.warn('[geocodePlaceORS] ORS lookup error:', e.message);
     }
+  } catch (e) {
+    console.warn('[geocodePlaceORS] Backend lookup error:', e.message);
   }
 
-  // 2. Robust fallback via Nominatim
+  // 2. Nominatim fallback (public, no key)
   try {
     const nomUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleaned)}&format=json&limit=1`;
     const res = await fetch(nomUrl, {
@@ -94,63 +85,61 @@ export async function geocodePlaceORS(query) {
 }
 
 /**
- * Fetch up to `limit` tourist POIs near given coordinates from ORS POI API.
- * Returns normalized place objects, empty array on failure.
+ * Fetch up to `limit` tourist POIs near given coordinates via backend ORS POI proxy.
  */
 export async function fetchORSTouristPlaces(lat, lng, limit = 2, bufferMeters = 5000) {
-  if (!ORS_KEY || lat == null || lng == null) return [];
+  if (lat == null || lng == null) return [];
   try {
-    const res = await fetch(`${ORS_BASE}/pois`, {
+    const res = await fetch(`${BACKEND_URL}/api/planner/ors/pois`, {
       method: 'POST',
-      headers: {
-        'Authorization': ORS_KEY,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, application/geo+json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        request: 'pois',
-        geometry: {
-          geojson: { type: 'Point', coordinates: [lng, lat] },
-          buffer: bufferMeters,
+        request: {
+          request: 'pois',
+          geometry: {
+            geojson: { type: 'Point', coordinates: [lng, lat] },
+            buffer: bufferMeters,
+          },
+          filters: { category_ids: TOURIST_CATEGORY_IDS },
+          limit,
+          sortby: 'distance',
         },
-        filters: { category_ids: TOURIST_CATEGORY_IDS },
-        limit,
-        sortby: 'distance',
       }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(9000),
     });
 
     if (!res.ok) return [];
     const data = await res.json();
+    if (data.code === 'PLANNER_UNAVAILABLE') return [];
     const features = data.features || [];
     if (features.length === 0) return [];
 
     return features.slice(0, limit).map((f, i) => {
-      const tags = f.properties?.osm_tags || {};
+      const tags   = f.properties?.osm_tags || {};
       const catIds = f.properties?.category_ids
         ? Object.values(f.properties.category_ids).flat().map(Number)
         : [];
-      const name = tags.name || tags['name:en'] || `Tourist Spot ${i + 1}`;
+      const name        = tags.name || tags['name:en'] || `Tourist Spot ${i + 1}`;
       const [pLng, pLat] = f.geometry.coordinates;
 
       return {
-        id: `ors_${f.properties?.osm_id || `${lat}_${i}`}`,
+        id:          `ors_${f.properties?.osm_id || `${lat}_${i}`}`,
         name,
-        city: tags['addr:city'] || tags['addr:town'] || '',
-        state: tags['addr:state'] || '',
-        zone: 'ORS',
-        type: getCategoryLabel(catIds, tags),
+        city:         tags['addr:city'] || tags['addr:town'] || '',
+        state:        tags['addr:state'] || '',
+        zone:         'ORS',
+        type:         getCategoryLabel(catIds, tags),
         significance: 'Tourist Attraction',
-        description: tags.description || tags.tourism || 'A notable attraction near your destination.',
+        description:  tags.description || tags.tourism || 'A notable attraction near your destination.',
         entrance_fee_inr: 0,
         dslr_allowed: 'Yes',
-        weekly_off: 'None',
-        rating: 4.0,
+        weekly_off:   'None',
+        rating:       4.0,
         lat: pLat,
         lng: pLng,
-        image: null,
-        source: 'ors',
-        osm_tags: tags,
+        image:        null,
+        source:       'ors',
+        osm_tags:     tags,
         category_ids: catIds,
       };
     });
@@ -161,29 +150,21 @@ export async function fetchORSTouristPlaces(lat, lng, limit = 2, bufferMeters = 
 }
 
 /**
- * Reverse-geocode coordinates to find the nearest named locality using ORS.
- * Returns { cityName, lat, lng } or null on failure.
+ * Reverse-geocode coordinates to nearest locality via backend ORS proxy.
  */
 export async function fetchNearestCityORS(lat, lng) {
-  if (!ORS_KEY) return null;
   try {
-    const url = new URL(`${ORS_BASE}/geocode/reverse`);
-    url.searchParams.set('api_key', ORS_KEY);
-    url.searchParams.set('point.lon', String(lng));
-    url.searchParams.set('point.lat', String(lat));
-    url.searchParams.set('size', '5');
-    url.searchParams.set('layers', 'locality');
-    url.searchParams.set('boundary.country', 'IND');
-
-    const res = await fetch(url.toString(), { signal: AbortSignal.timeout(6000) });
+    const res = await fetch(
+      `${BACKEND_URL}/api/planner/ors/geocode?text=${lat},${lng}&type=reverse`,
+      { signal: AbortSignal.timeout(7000) }
+    );
     if (!res.ok) return null;
     const data = await res.json();
-
+    if (data.code === 'PLANNER_UNAVAILABLE') return null;
     const feature = data.features
       ?.filter(f => f.properties?.layer === 'locality' && f.properties?.confidence > 0.3)
       .sort((a, b) => (b.properties?.confidence || 0) - (a.properties?.confidence || 0))[0]
       || data.features?.[0];
-
     if (!feature) return null;
     const [fLng, fLat] = feature.geometry.coordinates;
     return {
@@ -208,4 +189,3 @@ function getCategoryLabel(categoryIds, tags = {}) {
   if (categoryIds.includes(162) || categoryIds.includes(160)) return 'Tourist Attraction';
   return 'Tourist Attraction';
 }
-

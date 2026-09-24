@@ -35,15 +35,8 @@ async function getRouteWaypoints(polylineCoords) {
 }
 
 
-const VITE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY?.replace(/"/g, '');
-// gemini-2.0-flash is the current stable model on v1beta
-const MODELS = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-latest',
-];
-const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+// All Gemini calls go through the backend proxy -- no key in the browser bundle.
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 /**
  * Core Gemini call.
@@ -89,118 +82,13 @@ async function callGemini(userMessage, systemInstruction = null, requireDays = f
       }
     } else if (proxyRes.status !== 503) {
       // 503 means key not set on server â€” expected for local dev, fall through silently
-      console.warn(`[callGemini] Backend proxy returned ${proxyRes.status} â€” falling back to direct call`);
+      console.warn(`[callGemini] Backend returned ${proxyRes.status}`);
     }
   } catch (proxyErr) {
-    // Network error (backend not running) â€” fall through to direct call for local dev
-    console.warn('[callGemini] Backend proxy unreachable, trying direct call:', proxyErr.message);
+    console.warn('[callGemini] Backend unreachable:', proxyErr.message);
   }
 
-  // --- 2. Local dev fallback: call Gemini directly with VITE key ---
-  // This branch only runs when:
-  //   a) Backend is not running (local dev)
-  //   b) Backend returned 503 (PLANNER_GEMINI_API_KEY not yet set on server)
-  if (VITE_API_KEY && VITE_API_KEY.startsWith('csk-')) {
-    console.log("Cerebras API key detected. Calling Cerebras completions API with model gemma-4-31b...");
-    try {
-      const url = "https://api.cerebras.ai/v1/chat/completions";
-      const messages = [];
-      if (systemInstruction) {
-        messages.push({ role: "system", content: systemInstruction });
-      }
-      messages.push({ role: "user", content: userMessage });
-
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${VITE_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: "gemma-4-31b",
-          messages,
-          response_format: { type: "json_object" }
-        })
-      });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`Cerebras returned error ${res.status}: ${errText}`);
-      }
-
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      return content;
-    } catch (err) {
-      console.warn("Cerebras call failed:", err.message);
-      throw err;
-    }
-  }
-
-  if (!VITE_API_KEY) {
-    console.warn("No Gemini key available (backend not configured, no VITE key). Using fallback response.");
-    return JSON.stringify({
-      days: [],
-      trip_summary: { weather_note: 'Pleasant weather expected during travel dates.' },
-      tips: ['Enjoy your journey!']
-    });
-  }
-
-  for (const model of MODELS) {
-    try {
-      const url = `${BASE_URL}/${model}:generateContent?key=${VITE_API_KEY}`;
-      const payload = {
-        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-        generationConfig: {
-          temperature: 0.2,       // Low for deterministic, fact-accurate JSON
-          maxOutputTokens: 16384, // Multi-day itineraries need room to breathe
-          responseMimeType: 'application/json',
-        },
-      };
-
-      if (systemInstruction) {
-        payload.systemInstruction = { parts: [{ text: systemInstruction }] };
-      }
-
-      console.log(`Calling Gemini API directly (${model})...`);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errText = await res.text().catch(() => '');
-        console.warn(`Model ${model} returned error ${res.status}: ${errText}`);
-        continue;
-      }
-
-      const data = await res.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
-      if (!rawText) {
-        continue;
-      }
-
-      if (requireDays) {
-        try {
-          const testObj = extractJSON(rawText);
-          const daysArr = testObj.days || testObj.itinerary || [];
-          if (!Array.isArray(daysArr) || daysArr.length === 0) {
-            continue;
-          }
-        } catch {
-          continue;
-        }
-      }
-
-      return rawText;
-    } catch (err) {
-      console.warn(`Failed with model ${model}:`, err.message);
-    }
-  }
-
-  // Gracefully return valid fallback text instead of throwing 400 error
+  // Safe fallback — keeps the UI from crashing when backend is down
   return JSON.stringify({
     days: [],
     trip_summary: { weather_note: 'Pleasant weather expected during travel dates.' },

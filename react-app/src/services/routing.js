@@ -1,114 +1,72 @@
 import { toast } from 'react-toastify';
 import { haversineDistance, calculateETA } from '../utils/haversine';
 
-let ORS_KEY = import.meta.env.VITE_ORS_KEY || "";
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-
-async function getOrsKey() {
-  if (ORS_KEY) return ORS_KEY;
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/config/maps`);
-    const data = await res.json();
-    ORS_KEY = data.orsKey;
-    return ORS_KEY;
-  } catch (err) {
-    console.error("Failed to fetch maps config", err);
-    return "";
-  }
-}
-
-const ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+// All ORS calls go through the backend proxy — no key in the browser bundle.
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 /**
- * 2. ROUTING + TIME/DISTANCE
- * Use OpenRouteService for accurate driving time between states.
- * 
- * @param {Array} coordinatesArray - Array of coordinates [ [lng, lat], [lng, lat], ... ] or [ {lat, lng}, ... ]
+ * ROUTING + TIME/DISTANCE
+ * Uses the backend /v1/planner/route proxy → OpenRouteService.
+ *
+ * @param {Array} coordinatesArray - [ [lng, lat], ... ] or [ {lat, lng}, ... ]
  */
 export async function getRoute(coordinatesArray) {
-  if (!coordinatesArray || coordinatesArray.length < 2) {
-    return null;
-  }
+  if (!coordinatesArray || coordinatesArray.length < 2) return null;
 
-  // Normalize coordinates to [ [lng, lat], [lng, lat] ]
+  // Normalize to [[lng, lat], ...]
   const formattedCoords = coordinatesArray.map(c => {
-    if (Array.isArray(c)) {
-      // Assuming array input is already [lng, lat] based on RouteMapPanel
-      return [Number(c[0]), Number(c[1])];
-    }
-    if (typeof c === 'object' && c.lat !== undefined && c.lng !== undefined) {
+    if (Array.isArray(c)) return [Number(c[0]), Number(c[1])];
+    if (typeof c === 'object' && c.lat !== undefined && c.lng !== undefined)
       return [Number(c.lng), Number(c.lat)];
-    }
     return [78.9629, 20.5937];
   });
 
   try {
-    const requestBody = {
-      coordinates: formattedCoords,
-      instructions: false
-    };
-    console.log("ORS Request:", JSON.stringify(requestBody));
-
-    const key = await getOrsKey();
-    if (!key) throw new Error("Missing ORS API Key");
-
-    const res = await fetch(ORS_URL, {
+    const res = await fetch(`${BACKEND_URL}/v1/planner/route`, {
       method: 'POST',
-      headers: {
-        'Authorization': key,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coordinates: formattedCoords, instructions: false }),
     });
 
-    if (!res.ok) {
-      throw new Error(`OpenRouteService API returned status ${res.status}`);
-    }
+    if (!res.ok) throw new Error(`Backend route proxy returned ${res.status}`);
 
     const data = await res.json();
-    console.log("ORS Response:", data);
+    if (data.code === 'PLANNER_UNAVAILABLE') throw new Error(data.message);
+
     const routeFeature = data.features?.[0];
+    if (!routeFeature) throw new Error('No route feature returned');
 
-    if (!routeFeature) {
-      throw new Error("No route feature returned from ORS API");
-    }
-
-    const summary = routeFeature.properties?.summary || {};
+    const summary    = routeFeature.properties?.summary || {};
     const distanceKm = Math.round((summary.distance || 0) / 1000 * 10) / 10;
-    
-    let durationSec = summary.duration || 0;
-    // ORS calculates theoretical duration assuming free-flowing traffic at max speed limits.
-    // For Indian road conditions (tolls, traffic, terrain), we cap the average speed to 60 km/h.
-    const avgSpeedKmH = distanceKm / (durationSec / 3600);
-    if (avgSpeedKmH > 60) {
-      durationSec = (distanceKm / 60) * 3600;
-    }
 
-    const hours = Math.floor(durationSec / 3600);
+    let durationSec = summary.duration || 0;
+    // Cap average speed at 60 km/h for Indian road conditions
+    const avgSpeedKmH = distanceKm / (durationSec / 3600);
+    if (avgSpeedKmH > 60) durationSec = (distanceKm / 60) * 3600;
+
+    const hours   = Math.floor(durationSec / 3600);
     const minutes = Math.round((durationSec % 3600) / 60);
 
-    // ORS geometry coordinates are [[lng, lat], [lng, lat], ...]
-    // Leaflet Polyline expects [[lat, lng], [lat, lng], ...]
-    const rawGeometry = routeFeature.geometry?.coordinates || [];
+    // ORS geometry: [[lng,lat],...] → Leaflet needs [[lat,lng],...]
+    const rawGeometry   = routeFeature.geometry?.coordinates || [];
     const leafletPolyline = rawGeometry.map(coord => [coord[1], coord[0]]);
 
-    // Calculate fuel cost (assuming 15 km/L @ ₹96/L)
     const fuelCostInr = Math.round((distanceKm / 15) * 96);
 
     return {
       distanceKm,
       durationDisplay: hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`,
-      durationStr: hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`,
-      durationHours: Math.round(durationSec / 36) / 100,
-      totalMinutes: Math.round(durationSec / 60),
+      durationStr:     hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`,
+      durationHours:   Math.round(durationSec / 36) / 100,
+      totalMinutes:    Math.round(durationSec / 60),
       fuelCostInr,
       polylineCoords: leafletPolyline,
-      source: 'ors'
+      source: 'ors',
     };
 
   } catch (err) {
-    console.error("ORS failed, using haversine distance fallback:", err.message || err);
-    toast.warn("Routing offline. Time estimates are approximate", { toastId: 'ors-fallback-warn' });
+    console.error('Route proxy failed, using haversine fallback:', err.message || err);
+    toast.warn('Routing offline. Time estimates are approximate', { toastId: 'ors-fallback-warn' });
     return getHaversineFallbackRoute(formattedCoords);
   }
 }
@@ -123,25 +81,24 @@ function getHaversineFallbackRoute(formattedCoords) {
   for (let i = 0; i < formattedCoords.length; i++) {
     const [lng, lat] = formattedCoords[i];
     polylineCoords.push([lat, lng]);
-
     if (i > 0) {
       const [prevLng, prevLat] = formattedCoords[i - 1];
       totalDistanceKm += haversineDistance(prevLat, prevLng, lat, lng);
     }
   }
 
-  const distKm = Math.round(totalDistanceKm * 10) / 10;
-  const eta = calculateETA(distKm, 50); // 50 km/h avg speed
+  const distKm      = Math.round(totalDistanceKm * 10) / 10;
+  const eta         = calculateETA(distKm, 50);
   const fuelCostInr = Math.round((distKm / 15) * 96);
 
   return {
-    distanceKm: distKm,
+    distanceKm:    distKm,
     durationDisplay: eta.display,
-    durationStr: eta.display,
-    durationHours: Math.round(eta.totalMinutes / 60 * 100) / 100,
-    totalMinutes: eta.totalMinutes,
+    durationStr:     eta.display,
+    durationHours:   Math.round(eta.totalMinutes / 60 * 100) / 100,
+    totalMinutes:    eta.totalMinutes,
     fuelCostInr,
     polylineCoords,
-    source: 'haversine'
+    source: 'haversine',
   };
 }
