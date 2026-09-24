@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     container_name: trip-planner-frontend
     ports:
-      - "80:80"
+      - "8084:80"
     # To use a different port locally, change "80:80" to "3000:80"
     restart: unless-stopped
     depends_on:
