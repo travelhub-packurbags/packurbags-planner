@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCamera, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import 'leaflet/dist/leaflet.css';
-import { geocodeCity, getGoogleKey } from '../../services/places';
+import { geocodeCity } from '../../services/places';
 import { getRoute } from '../../services/routing';
 
 // ── Custom marker icons ────────────────────────────────────────────

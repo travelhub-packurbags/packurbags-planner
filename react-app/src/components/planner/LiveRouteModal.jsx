@@ -9,7 +9,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'react-toastify';
 import { getRoute } from '../../services/routing';
-import { searchPlaces, getPlaceDetails, geocodeCity, getGoogleKey } from '../../services/places';
+import { searchPlaces, getPlaceDetails, geocodeCity } from '../../services/places';
 import { haversineDistance } from '../../utils/haversine';
 
 const hotelIcon = L.divIcon({

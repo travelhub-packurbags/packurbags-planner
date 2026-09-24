@@ -15,7 +15,7 @@ import {
   faLocationDot 
 } from '@fortawesome/free-solid-svg-icons';
 import { toast } from 'react-toastify';
-import { searchPlaces, getPlaceDetails, geocodeCity, getGoogleKey } from '../../services/places';
+import { searchPlaces, getPlaceDetails, geocodeCity } from '../../services/places';
 import { getRoute } from '../../services/routing';
 import { geocodePlaceORS } from '../../services/orsPlaces';
 import { faCamera } from '@fortawesome/free-solid-svg-icons';

@@ -4,7 +4,7 @@ import { faSpinner, faStar, faExclamationTriangle, faUtensils, faCamera } from '
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { geocodeCity, getGoogleKey } from '../../services/places';
+import { geocodeCity } from '../../services/places';
 import { getRoute } from '../../services/routing';
 import { toast } from 'react-toastify';
 
@@ -173,24 +173,16 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
     if (findingRest) return;
     setFindingRest(hotel.id);
     try {
-      const key = await getGoogleKey();
-      if (!key) throw new Error('No Google key');
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
       const query = `restaurants near ${hotel.property_name} ${hotel.city || hotel.routeCityName || ''}`;
-      const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.rating,places.priceLevel'
-        },
-        body: JSON.stringify({ textQuery: query, maxResultCount: 5 })
-      });
+      const res = await fetch(`${BACKEND_URL}/v1/planner/places/search?q=${encodeURIComponent(query)}`);
+      if (!res.ok) throw new Error('Search failed');
       const data = await res.json();
-      const places = data.places || [];
-      if (places.length === 0) {
+      const suggestions = data.suggestions || [];
+      if (suggestions.length === 0) {
         toast.info('No restaurants found nearby');
       } else {
-        const names = places.slice(0, 3).map(p => `${p.displayName?.text || 'Restaurant'} (⭐${p.rating || '?'})`).join(', ');
+        const names = suggestions.slice(0, 3).map(s => s.placePrediction?.text?.text || 'Restaurant').join(', ');
         toast.success(`Nearby: ${names}`, { autoClose: 6000 });
       }
     } catch (err) {
@@ -205,7 +197,7 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
     if (!onCaptureSnippet || isCapturing) return;
     setIsCapturing(true);
     try {
-      const key = await getGoogleKey();
+      const BACKEND_URL_LRC = import.meta.env.VITE_BACKEND_URL || '';
       let pathParam = '';
       if (routeInfo?.polylineCoords?.length > 0) {
         const coords = routeInfo.polylineCoords;
@@ -217,7 +209,8 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
         `&markers=color:red%7Clabel:${String.fromCharCode(65 + i)}%7C${s.lat},${s.lng}`
       ).join('');
       const mid = stops[Math.floor(stops.length / 2)] || { lat: 20.5937, lng: 78.9629 };
-      const staticUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${mid.lat},${mid.lng}&zoom=6&size=800x450&maptype=roadmap&scale=2${stopMarkers}${pathParam}&key=${key}`;
+      const rawParams = `center=${mid.lat},${mid.lng}&zoom=6&size=800x450&maptype=roadmap&scale=2${stopMarkers}${pathParam}`;
+      const staticUrl = `${BACKEND_URL_LRC}/api/planner/static-map?params=${encodeURIComponent(rawParams)}`;
       onCaptureSnippet({ image: staticUrl, distance: routeInfo?.distanceKm, time: routeInfo?.durationDisplay, fuel: routeInfo?.fuelCostInr || 0 });
       toast.success('Map snippet captured for itinerary!');
     } catch (err) {
