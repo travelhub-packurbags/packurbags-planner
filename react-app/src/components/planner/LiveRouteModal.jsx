@@ -67,7 +67,7 @@ const stopPinIcon = L.divIcon({
     font-weight: bold;
     font-size: 11px;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-  ">ðŸ“</div>`,
+  ">📍</div>`,
   iconSize: [24, 24],
   iconAnchor: [12, 12]
 });
@@ -146,14 +146,14 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
         }
       }
 
-      // 3. Fetch restaurants (fast, local file â€” doesn't delay map)
+      // 3. Fetch restaurants (fast, local file — doesn't delay map)
       const [rRes] = await Promise.all([
         fetch(`${import.meta.env.BASE_URL}data/swiggy.json`).then(r => r.json()).catch(() => [])
       ]);
 
       const destCities = (destinations || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 
-      // âœ… Show map NOW â€” don't wait for hotels
+      // ✅ Show map NOW — don't wait for hotels
       setLoading(false);
 
       // 4. Fetch LIVE hotels in background with hard 8s per-request timeout (parallel)
@@ -275,7 +275,7 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
         
         setRestaurants([...sortedDestRests, ...sortedMidwayRests]);
       } else {
-        // Fallback when ORS polyline is unavailable â€” build a straight-line polyline between stops
+        // Fallback when ORS polyline is unavailable — build a straight-line polyline between stops
         
         // Build approximate polyline as straight segments between stops for restaurant filtering
         const approxPolyline = [];
@@ -480,13 +480,13 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
                 </p>
                 {routeInfo && (
                   <div className="flex items-center gap-3 text-xs font-bold text-gray-700 bg-white border border-gray-200 shadow-sm px-3 py-1.5 rounded-lg">
-                    <span className="flex items-center gap-1">ðŸ›£ï¸ {routeInfo.distanceKm} km</span>
+                    <span className="flex items-center gap-1">🛣️ {routeInfo.distanceKm} km</span>
                     <span className="text-gray-300">|</span>
                     <span className="flex items-center gap-1">â±ï¸ {routeInfo.durationDisplay}</span>
                     {routeInfo.fuelCostInr > 0 && (
                       <>
                         <span className="text-gray-300">|</span>
-                        <span className="flex items-center gap-1">â›½ Est. â‚¹{routeInfo.fuelCostInr}</span>
+                        <span className="flex items-center gap-1">⛽ Est. ₹{routeInfo.fuelCostInr}</span>
                       </>
                     )}
                   </div>
@@ -514,7 +514,7 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
 
           {/* Map Body */}
           <div id="live-route-map-container" className="flex-grow relative bg-gray-100 z-0">
-            {/* Loading overlay â€” floats on top of the map */}
+            {/* Loading overlay — floats on top of the map */}
             {loading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center z-[400] bg-white/80 backdrop-blur-sm">
                 <FontAwesomeIcon icon={faSpinner} spin className="text-4xl text-[#D4B15A] mb-4" />
@@ -522,7 +522,7 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
               </div>
             )}
 
-            {/* MapContainer always renders â€” never conditionally destroyed */}
+            {/* MapContainer always renders — never conditionally destroyed */}
             <MapContainer
               center={mapCenter}
               zoom={6}
@@ -565,7 +565,7 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
                       <div className="flex items-center gap-1 text-xs text-amber-500 mb-2">
                         <FontAwesomeIcon icon={faStar} />
                         <span className="font-bold text-gray-700">{h.hotel_stars} Stars</span>
-                        <span className="text-gray-400">| â‚¹{h.price_per_night_inr}</span>
+                        <span className="text-gray-400">| ₹{h.price_per_night_inr}</span>
                       </div>
                       
                       <button
@@ -595,7 +595,7 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
                       <div className="flex items-center gap-1 text-xs text-emerald-600 mt-1 font-bold">
                         <FontAwesomeIcon icon={faStar} />
                         <span>{r['Avg ratings']}</span>
-                        <span className="text-gray-400 font-normal">| â‚¹{r.Price} for two</span>
+                        <span className="text-gray-400 font-normal">| ₹{r.Price} for two</span>
                       </div>
                     </div>
                   </Popup>

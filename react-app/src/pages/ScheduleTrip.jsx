@@ -837,7 +837,7 @@ export default function ScheduleTrip() {
 
     // 5. Sightseeing Entry Fees
     (wizardData?.selectedPlaces || []).forEach(p => {
-      const fee = Number(p.entryFee || p.fee || 0);
+      const fee = Number(p.entrance_fee_inr || p.entryFee || p.fee || 0);
       total += fee * travellers;
     });
 

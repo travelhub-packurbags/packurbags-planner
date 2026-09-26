@@ -127,7 +127,7 @@ export default function Step5Dining({
         }
         
         if (loaded > 0) {
-          toast.success(`ðŸ“¸ ${loaded} real restaurant photos loaded!`, {
+          toast.success(`📷 ${loaded} real restaurant photos loaded!`, {
             position: 'bottom-right', autoClose: 3000,
           });
         }

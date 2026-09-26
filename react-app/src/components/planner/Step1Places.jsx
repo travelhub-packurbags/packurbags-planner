@@ -24,7 +24,7 @@ import {
 import { fetchWeather, getPrecautions } from '../../services/weather';
 import { searchPlaces, getPlaceDetails, fetchGoogleAttractions } from '../../services/places';
 import { faSpinner, faLocationDot } from '@fortawesome/free-solid-svg-icons';
-import { fetchFoursquareImage } from '../../services/foursquare'; // Google Places â€” restaurants only (Step5)
+import { fetchFoursquareImage } from '../../services/foursquare'; // Google Places — restaurants only (Step5)
 import { fetchWikipediaImage } from '../../services/wikipedia';    // Wikipedia — tourist places
 import { geocodeCityORS, fetchORSTouristPlaces, fetchNearestCityORS } from '../../services/orsPlaces'; // ORS fallback
 import { saveSelectedImage, getSelectedImage } from '../../services/supabaseStorage';
@@ -113,7 +113,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
     return true;
   };
 
-  // StrictMode guard â€” prevents the double-invoke from firing loadPlacesAndWeather twice.
+  // StrictMode guard — prevents the double-invoke from firing loadPlacesAndWeather twice.
   // Reset when destination changes so a real city change re-fetches correctly.
   const loadingRef = useRef(false);
   const lastDestinationRef = useRef(null);
@@ -147,7 +147,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         }
 
         // Call fetchGoogleAttractions to supplement place data when local JSON has < 5 results.
-        // Photos are NOT fetched here â€” Wikipedia handles them in the useEffect below.
+        // Photos are NOT fetched here — Wikipedia handles them in the useEffect below.
         const finalCity = (destination || '').split(',').pop().trim();
         let googlePlaces = [];
         try {
@@ -166,10 +166,10 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
           }
         }
 
-        // â”€â”€ ORS POI Fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── ORS POI Fallback ──────────────────────────────────────────────────
         // Only runs when local dataset + Google both returned nothing.
         // Hard cap: max 2 places. Two ORS calls max (geocode + POI, or +reverse).
-        // Any failure is silent â€” falls through to empty state.
+        // Any failure is silent — falls through to empty state.
         if (filtered.length === 0) {
           try {
             const coords = await geocodeCityORS(finalCity);
@@ -200,15 +200,15 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
             }
           } catch (orsErr) {
             console.warn('[ORS Fallback] Skipped:', orsErr.message);
-            // filtered stays [] â†’ empty state UI renders below
+            // filtered stays [] → empty state UI renders below
           }
         }
-        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ─────────────────────────────────────────────────────────────────────
 
 
         setPlaces(filtered);
 
-        // Fetch live XWeather data for each unique city represented in the hubs
+        // Fetch live Weather data for each unique city represented in the hubs
         const uniqueCities = Array.from(new Set(filtered.map(p => p.city).filter(Boolean)));
         const wMap = {};
         await Promise.all(
@@ -233,10 +233,10 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
     return () => { loadingRef.current = false; };
   }, [destination]);
 
-  // â”€â”€â”€ Wikipedia photo loader â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Wikipedia photo loader ───────────────────────────────────────────────
   // Runs after places are set. Fetches Wikipedia thumbnail for each place
   // that doesn't already have an image. Wikipedia is free, no auth, 200 req/s
-  // limit â€” completely immune to 429. Uses ctrl-cancel for StrictMode safety.
+  // limit — completely immune to 429. Uses ctrl-cancel for StrictMode safety.
   useEffect(() => {
     if (!places || places.length === 0) return;
     const ctrl = { cancelled: false };
@@ -341,7 +341,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         const wikiImg = await fetchWikipediaImage(placeName, placeCity);
         if (wikiImg) {
           setPlaceImages(prev => ({ ...prev, [`${placeName}::${placeCity}`]: wikiImg }));
-          toast.success(`ðŸ“¸ Photo loaded for "${placeName}" via Wikipedia!`, {
+          toast.success(`📷 Photo loaded for "${placeName}" via Wikipedia!`, {
             position: 'bottom-right',
             autoClose: 2500,
           });
@@ -606,10 +606,10 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                     {place.name}
                   </h3>
                   <div className="flex items-center justify-between text-xs text-gray-400 font-medium mb-3">
-                    <span>ðŸ“ {place.city}, {place.state}</span>
+                    <span>📍 {place.city}, {place.state}</span>
                     {hubWeather && (
                       <span className="bg-amber-500/10 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
-                        ðŸŒ¤ï¸ {hubWeather.maxTemp}Â°C â€¢ Rain: {hubWeather.maxRain}%
+                        ⛅ {hubWeather.maxTemp}°C • Rain: {hubWeather.maxRain}%
                       </span>
                     )}
                   </div>
@@ -666,7 +666,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
             {/* Modal Header */}
             <div className="bg-[#121619] text-white p-6 relative">
               <span className="text-[10px] uppercase font-extrabold tracking-widest text-[#D4B15A] bg-white/10 px-2.5 py-1 rounded-md mb-2 inline-block">
-                {activeModalPlace.type} â€¢ {activeModalPlace.city}
+                {activeModalPlace.type} • {activeModalPlace.city}
               </span>
               <h3 className="text-2xl font-bold text-white font-display">
                 {activeModalPlace.name}
@@ -699,17 +699,17 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                         </div>
                         <div>
                           <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A]">
-                            XWeather Live Update â€¢ {activeModalPlace.name}
+                            Weather Live Update • {activeModalPlace.name}
                           </span>
                           <h4 className="font-bold text-white text-sm">
-                            ðŸ“ {activeModalPlace.city} Weather Conditions
+                            📍 {activeModalPlace.city} Weather Conditions
                           </h4>
                         </div>
                       </div>
                       {daySummary && (
                         <div className="text-right">
                           <span className="text-base font-extrabold text-[#D4B15A] block">
-                            {daySummary.maxTemp}Â°C / {daySummary.minTemp}Â°C
+                            {daySummary.maxTemp}°C / {daySummary.minTemp}°C
                           </span>
                           <span className="text-[10px] text-gray-400 font-semibold uppercase">{daySummary.mainWeather}</span>
                         </div>
@@ -763,7 +763,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                     <FontAwesomeIcon icon={faMoneyBillWave} className="text-[#D4B15A]" /> Entrance Fee
                   </p>
                   <p className="font-bold text-gray-800 text-sm mt-0.5">
-                    {activeModalPlace.entrance_fee_inr > 0 ? `â‚¹${activeModalPlace.entrance_fee_inr}` : 'Free Entry'}
+                    {activeModalPlace.entrance_fee_inr > 0 ? `₹${activeModalPlace.entrance_fee_inr}` : 'Free Entry'}
                   </p>
                 </div>
 
