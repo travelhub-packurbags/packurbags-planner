@@ -379,7 +379,14 @@ export async function geocodeCity(cityName) {
     'port blair': { lat: 11.6234, lng: 92.7265 },
   };
 
-  const localMatch = Object.keys(CITY_COORDS).find(k => q.includes(k));
+  let localMatch = null;
+  if (CITY_COORDS[q]) {
+    localMatch = q;
+  } else {
+    // Prevent substring bugs like "visakha-patna-m" matching "patna"
+    localMatch = Object.keys(CITY_COORDS).find(k => q.startsWith(k + ',') || q.startsWith(k + ' '));
+  }
+  
   if (localMatch) {
     return CITY_COORDS[localMatch];
   }
@@ -479,7 +486,20 @@ export async function geocodeCity(cityName) {
     'periyar': { lat: 9.4679, lng: 77.1432 },
     'backwater': { lat: 9.6000, lng: 76.3667 },
   };
-  const exactMatch = Object.keys(EXACT_LANDMARKS).find(k => q.includes(k));
+  let exactMatch = null;
+  if (EXACT_LANDMARKS[q]) {
+    exactMatch = q;
+  } else {
+    // Basic boundary check to avoid substring bugs
+    exactMatch = Object.keys(EXACT_LANDMARKS).find(k => {
+      // Must match at the start or have a space/comma before it
+      const idx = q.indexOf(k);
+      if (idx === -1) return false;
+      if (idx === 0) return true;
+      const charBefore = q[idx - 1];
+      return charBefore === ' ' || charBefore === ',' || charBefore === '-';
+    });
+  }
   if (exactMatch) {
     return EXACT_LANDMARKS[exactMatch];
   }
