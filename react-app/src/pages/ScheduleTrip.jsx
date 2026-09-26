@@ -377,8 +377,8 @@ export default function ScheduleTrip() {
       let routeInfo = check.routeInfo || null;
       if (!routeInfo) {
         try {
-          const fromCoords = await geocodeCity(params.fromCity || 'Delhi');
-          const destCoords = await Promise.all(locList.map(l => geocodeCity(l)));
+          const fromCoords = await geocodeBestEffort(params.fromCity || 'Delhi');
+          const destCoords = await Promise.all(locList.map(l => geocodeBestEffort(l)));
           const allCoords = [fromCoords, ...destCoords].filter(Boolean);
           if (allCoords.length >= 2) routeInfo = await getRoute(allCoords);
         } catch (err) { console.warn('Failed to calculate pre-route info:', err); }
@@ -412,6 +412,30 @@ export default function ScheduleTrip() {
         }
       } catch (err) { console.warn('DSA auto-transport fetch failed:', err.message); }
 
+      // ── LIVE DSA Hotel Fetch ──
+      let liveHotels = null;
+      try {
+        const totalDays = check.totalDays || calculateTotalDays(params);
+        const nights = totalDays > 1 ? totalDays - 1 : 1;
+        const hotelRes = await fetch(`${BACKEND}/api/dsa/hotels/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            city: locList[0],
+            checkIn: params.fromDate || new Date().toISOString().split('T')[0],
+            checkOut: params.toDate || new Date(Date.now() + 86400000).toISOString().split('T')[0],
+            rooms: 1,
+            adults: params.travellers || 2,
+            nights: nights
+          })
+        });
+        const hData = await hotelRes.json();
+        if (hData.success && hData.results && hData.results.length > 0) {
+          liveHotels = hData.results.slice(0, 5); // Take top 5 realistic options
+          console.log('[AutoPlan] Live DSA hotels loaded:', liveHotels.length);
+        }
+      } catch (err) { console.warn('DSA auto-hotel fetch failed:', err.message); }
+
       const generated = await generateTripPlan({
         locations: locList,
         fromDate: params.fromDate,
@@ -423,7 +447,8 @@ export default function ScheduleTrip() {
         travellerCount: params.travellers,
         tripType: params.tripType,
         routeInfo,
-        liveTransport,  // Pass DSA live transport data to the AI
+        liveTransport,
+        liveHotels,
       });
 
       if (generated.error) {
@@ -471,8 +496,8 @@ export default function ScheduleTrip() {
       let routeInfo = check.routeInfo || null;
       if (!routeInfo) {
         try {
-          const fromCoords = await geocodeCity(params.fromCity || 'Delhi');
-          const destCoords = await Promise.all(locList.map(l => geocodeCity(l)));
+          const fromCoords = await geocodeBestEffort(params.fromCity || 'Delhi');
+          const destCoords = await Promise.all(locList.map(l => geocodeBestEffort(l)));
           const allCoords = [fromCoords, ...destCoords].filter(Boolean);
           if (allCoords.length >= 2) {
             routeInfo = await getRoute(allCoords);

@@ -614,6 +614,7 @@ export async function generateTripPlan(config) {
     returnTransport = null,
     routeInfo = null,
     liveTransport = null,  // DSA live transport from auto-transport endpoint
+    liveHotels = null,     // DSA live hotels
   } = config;
 
   // ── Helper: normalize any date string to YYYY-MM-DD ──
@@ -691,7 +692,12 @@ INSTRUCTION: Prioritize placing these verified spots in the itinerary. You may a
   }
 
   // ── Inject verified local hotels ──
-  if (verifiedHotels.length > 0) {
+  if (liveHotels && liveHotels.length > 0) {
+    const liveHotelList = liveHotels.map(h => `* [hotel_id: ${h.id}] ${h.name} — ${h.starRating || 3} Stars, ₹${h.price || 3500}/night, ${h.address || h.city}`).join('\n');
+    userMessage += `\n\n- LIVE_AVAILABLE_HOTELS (Real-time live prices from API — MUST USE ONE OF THESE):
+${liveHotelList}
+INSTRUCTION: You MUST use one of these live hotels for the destination stay days. Do NOT invent hotel names. If user has CUSTOMER_SELECTED_HOTEL_STAY_SEQUENCE below, that takes priority.`;
+  } else if (verifiedHotels.length > 0) {
     userMessage += `\n\n- DESTINATION_VERIFIED_HOTELS (real hotels from database — use hotel_id exactly as given):
 ${verifiedHotels.join('\n')}
 INSTRUCTION: Use one of these real hotels for the destination stay days. Copy the hotel_id field exactly. If user has CUSTOMER_SELECTED_HOTEL_STAY_SEQUENCE below, that takes priority.`;
@@ -709,7 +715,7 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
 
   // Inject real-world ORS route knowledge
   if (routeInfo) {
-    userMessage += `\n\n- REALTIME_ROUTE_KNOWLEDGE: \nThe total driving distance is ${routeInfo.distanceKm} km. \nThe estimated driving time is ${routeInfo.durationDisplay}. \nThe estimated fuel cost is \u20b9${routeInfo.fuelCostInr}.\nAVERAGE SPEED: Use 75 km/hr for vehicle trips. Segment duration = distance_km / 75 hours.\nCRITICAL: Use this travel time to realistically space out activities and travel days!`;
+    userMessage += `\n\n- REALTIME_ROUTE_KNOWLEDGE: \nThe total driving distance is ${routeInfo.distanceKm} km. \nThe estimated driving time is ${routeInfo.durationDisplay}. \nThe estimated fuel cost is \u20b9${routeInfo.fuelCostInr}.\nAVERAGE SPEED: Use 60 km/hr for Indian highways (as calculated by the routing engine). Segment duration = distance_km / 60 hours.\nCRITICAL: Use this travel time to realistically space out activities and travel days!`;
     if (routeWaypoints.length > 0) {
       userMessage += `\nACTUAL GPS-VERIFIED HIGHWAY CITIES ON THIS ROUTE: ${routeWaypoints.join(' -> ')}. Name dhabas/restaurants ONLY in these cities. DO NOT hallucinate cities from other highways.`;
     }
@@ -797,6 +803,7 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
   }
 
   // Live DSA Transport Data (from auto-generated itinerary — real API data)
+  const isTransportMode = mode && (mode.toLowerCase().includes('flight') || mode.toLowerCase().includes('bus') || mode.toLowerCase().includes('train'));
   if (liveTransport && (liveTransport.outbound || liveTransport.return)) {
     const src = liveTransport.source || 'DSA';
     userMessage += `\n\n- LIVE_DSA_TRANSPORT_DATA (from ${src} live API — USE THESE EXACT DETAILS):`;
@@ -809,6 +816,22 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
       userMessage += `\n* Return Flight/Bus (Last Day): ${r.operator} ${r.code || ''}, Departs ${r.depTime}, Arrives ${r.arrTime}, Duration: ${r.duration}, Fare: ₹${r.price}/person, Baggage: ${r.baggage || 'N/A'}`;
     }
     userMessage += `\n\nCRITICAL: Use the above LIVE DSA transport details verbatim in intercity_transport section. Set operator, dep_time, arr_time, duration, cost_inr from these values. Do NOT invent or use synthetic flight/bus details.`;
+  } else if (isTransportMode && !outboundTransport && !returnTransport) {
+    userMessage += `\n\nCRITICAL: Live flight/bus data is currently unavailable. Do NOT invent flight numbers, airlines, or exact times. In the intercity_transport section, simply write "operator": "To be booked locally", "dep_time": "Morning/Evening", and estimate a realistic budget cost.`;
+  }
+
+  // ── Inject personalized touches based on Trip Type ──
+  userMessage += `\n\n- TRIP_TYPE_PERSONALIZATION: The user selected "${tripType}". Tailor the itinerary pace, tone, and recommendations for this specific style:`;
+  if (tripType.toLowerCase().includes('family')) {
+    userMessage += `\n  - Pace: Relaxed, minimal changing of hotels.\n  - Activities: Kid-friendly, accessible spots, no extremely strenuous treks.\n  - Dining: Family restaurants with varied menus.\n  - Schedule: Avoid very late night activities. Include afternoon downtime.`;
+  } else if (tripType.toLowerCase().includes('solo') || tripType.toLowerCase().includes('backpacker')) {
+    userMessage += `\n  - Pace: Fast, adventurous, highly flexible.\n  - Activities: Offbeat trails, hostels, meeting locals, high-adrenaline sports.\n  - Dining: Street food, local cafes, backpacker hangouts.\n  - Budget: Prioritize cost-effective local transit inside the city.`;
+  } else if (tripType.toLowerCase().includes('corporate') || tripType.toLowerCase().includes('business')) {
+    userMessage += `\n  - Pace: Efficient, structured.\n  - Amenities: Hotels/cafes must have good Wi-Fi and quiet environments.\n  - Activities: Premium experiences, quick sightseeing breaks between meetings.\n  - Dining: Fine dining, quiet lounges suitable for networking or relaxing after work.`;
+  } else if (tripType.toLowerCase().includes('couple') || tripType.toLowerCase().includes('romantic')) {
+    userMessage += `\n  - Pace: Leisurely and intimate.\n  - Activities: Scenic spots, sunset viewpoints, couple's spa if applicable.\n  - Dining: Candlelight dinners, romantic ambiance, premium cafes.`;
+  } else {
+    userMessage += `\n  - Provide a balanced mix of sightseeing, leisure, and local culture.`;
   }
 
   // Scheduled Dining (Cafes & Restaurants) — use safe fallbacks for missing day/timeSlot
@@ -819,9 +842,22 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
     userMessage += `\n\nCRITICAL INSTRUCTION: Place these [USER_SELECTED] restaurants and cafes into the itinerary. Mark them with "source": "user" in the schedule JSON. If no specific day is given, distribute them across destination days at appropriate meal times.`;
   }
 
-  userMessage += `\n\nCRITICAL BUDGET INSTRUCTION: You MUST calculate estimated_budget_inr and trip_summary.total_cost_inr to reflect the REAL total sum of all user-selected transport, hotels, rides, dining, and sightseeing fees. Do not output a low default estimate.
+  // Budget Guardrails
+  const estimatedMinBudget = computedTotalDays * travellerCount * 1500; // minimum ₹1500/day per person for basics
+  const isBudgetUnrealistic = budgetNumeric && budgetNumeric < estimatedMinBudget;
+  
+  userMessage += `\n\nCRITICAL BUDGET INSTRUCTION: You MUST calculate estimated_budget_inr and trip_summary.total_cost_inr to reflect the REAL total sum of all user-selected transport, hotels, rides, dining, and sightseeing fees.`;
+  
+  if (isBudgetUnrealistic) {
+    userMessage += `\nWARNING: The user's provided budget (₹${budgetNumeric}) is unrealistically low for ${travellerCount} travellers over ${computedTotalDays} days (Minimum realistic basic survival budget is ~₹${estimatedMinBudget}).
+    1. Do NOT hallucinate ₹100/night hotels or free flights to fit the budget.
+    2. Suggest the cheapest REALISTIC options (hostels, buses, street food).
+    3. The final \`total_cost_inr\` MUST reflect reality, even if it exceeds the user's requested budget. Do NOT fake numbers to make it fit.`;
+  } else {
+    userMessage += `\nEnsure the final budget reflects the chosen tier (${budget}) and doesn't artificially inflate or deflate real-world costs.`;
+  }
 
-FINAL REMINDER — "source" field in every schedule item:
+  userMessage += `\n\nFINAL REMINDER — "source" field in every schedule item:
 - "source": "user" → place/restaurant explicitly chosen by the user (from CUSTOMER_SELECTED lists above)
 - "source": "ai"   → everything else added by you to complete the itinerary
 This field MUST appear on every schedule item. Never omit it.`;
