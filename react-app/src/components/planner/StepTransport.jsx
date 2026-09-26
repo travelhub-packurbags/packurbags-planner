@@ -191,24 +191,26 @@ export default function StepTransport({
       }).then(r => r.json()),
     ]);
 
-    // Outbound — only mark live if source==='DSA' (not LocalFallback)
+    // Outbound — use results from backend, badge as live only if source==='DSA'
     const outFlightData    = fOut.status === 'fulfilled' ? fOut.value : null;
     const outBusData       = bOut.status === 'fulfilled' ? bOut.value : null;
-    const outFlightResults = outFlightData?.source === 'DSA' && outFlightData?.results?.length ? outFlightData.results : [];
-    const outBusResults    = outBusData?.source === 'DSA'    && outBusData?.results?.length    ? outBusData.results    : [];
+    const isLiveO          = (outFlightData?.source === 'DSA' && outFlightData?.results?.length > 0) || (outBusData?.source === 'DSA' && outBusData?.results?.length > 0);
+    const outFlightResults = outFlightData?.results?.length ? outFlightData.results : [];
+    const outBusResults    = outBusData?.results?.length ? outBusData.results : [];
     setDsaFlightsOut(outFlightResults);
     setDsaBusesOut(outBusResults);
-    setLiveOut(outFlightResults.length > 0 || outBusResults.length > 0);
+    setLiveOut(isLiveO);
     setLoadingOut(false);
 
     // Return — same logic
     const retFlightData    = fRet.status === 'fulfilled' ? fRet.value : null;
     const retBusData       = bRet.status === 'fulfilled' ? bRet.value : null;
-    const retFlightResults = retFlightData?.source === 'DSA' && retFlightData?.results?.length ? retFlightData.results : [];
-    const retBusResults    = retBusData?.source === 'DSA'    && retBusData?.results?.length    ? retBusData.results    : [];
+    const isLiveR          = (retFlightData?.source === 'DSA' && retFlightData?.results?.length > 0) || (retBusData?.source === 'DSA' && retBusData?.results?.length > 0);
+    const retFlightResults = retFlightData?.results?.length ? retFlightData.results : [];
+    const retBusResults    = retBusData?.results?.length ? retBusData.results : [];
     setDsaFlightsRet(retFlightResults);
     setDsaBusesRet(retBusResults);
-    setLiveRet(retFlightResults.length > 0 || retBusResults.length > 0);
+    setLiveRet(isLiveR);
     setLoadingRet(false);
 
     console.log('[StepTransport] DSA fetch complete — Out:', outFlightResults.length, 'flights,', outBusResults.length, 'buses | Ret:', retFlightResults.length, 'flights,', retBusResults.length, 'buses');

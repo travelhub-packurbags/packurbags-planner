@@ -609,6 +609,8 @@ export async function searchRestaurants(cityName) {
 }
 
 
+const attractionsCache = new Map();
+
 /**
  * Search for Top 10 Tourist Attractions in a given city using Google Places API
  */
