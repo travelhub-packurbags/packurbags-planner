@@ -289,10 +289,12 @@ app.post('/v1/planner/route', async (req, res) => {
   if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'ORS key not configured.' });
   const { coordinates, instructions = false } = req.body;
   if (!coordinates || coordinates.length < 2) return res.status(400).json({ error: 'coordinates array with at least 2 points required' });
+  // radiuses: -1 tells ORS to snap coordinates to the nearest road without 350m cutoff (crucial for islands, ferries, parks, and beaches)
+  const radiuses = coordinates.map(() => -1);
   try {
     const response = await axios.post(
       `${ORS_BASE}/v2/directions/driving-car/geojson`,
-      { coordinates, instructions },
+      { coordinates, instructions, radiuses },
       { headers: { 'Authorization': key, 'Content-Type': 'application/json' }, timeout: 15000 }
     );
     res.json(response.data);
