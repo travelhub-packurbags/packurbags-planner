@@ -801,6 +801,49 @@ export default function ScheduleTrip() {
     setWizardData(prev => ({ ...prev, returnTransport: item }));
   };
 
+  // Calculate live total customized cost across all selected items
+  const calculateTotalCost = useCallback(() => {
+    let total = 0;
+    const travellers = params.travellers || 1;
+
+    // 1. Outbound & Return Transport
+    if (wizardData?.outboundTransport?.price) {
+      total += (Number(wizardData.outboundTransport.price) || 0) * travellers;
+    }
+    if (wizardData?.returnTransport?.price) {
+      total += (Number(wizardData.returnTransport.price) || 0) * travellers;
+    }
+
+    // 2. Hotels
+    (wizardData?.selectedHotels || []).forEach(h => {
+      const price = Number(h.price || h.price_per_night_inr || h.price_inr || 0);
+      const nights = Number(h.nights || 1);
+      const rooms = Number(h.rooms || 1);
+      total += price * nights * rooms;
+    });
+
+    // 3. Ground Rides
+    (wizardData?.selectedRides || []).forEach(r => {
+      total += Number(r.price || 0);
+    });
+
+    // 4. Dining (Restaurants & Cafes)
+    (wizardData?.selectedRestaurants || []).forEach(r => {
+      total += Number(r.price || r.rate_for_two || 0);
+    });
+    (wizardData?.selectedCafes || []).forEach(c => {
+      total += Number(c.rate_for_two || c.price || 0);
+    });
+
+    // 5. Sightseeing Entry Fees
+    (wizardData?.selectedPlaces || []).forEach(p => {
+      const fee = Number(p.entryFee || p.fee || 0);
+      total += fee * travellers;
+    });
+
+    return total;
+  }, [wizardData, params.travellers]);
+
   return (
     <div className="pt-16 min-h-screen bg-gray-50 pb-20">
       

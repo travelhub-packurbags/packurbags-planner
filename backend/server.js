@@ -1166,19 +1166,19 @@ async function executeBusSearch({ from, to, date }) {
 }
 
 // ---- 1. DSA FLIGHT SEARCH ----
-app.post('/api/planner/dsa/flights/search', async (req, res) => {
+app.post(['/api/planner/dsa/flights/search', '/api/dsa/flights/search'], async (req, res) => {
   const result = await executeFlightSearch(req.body);
   res.json(result);
 });
 
 // ---- 2. DSA BUS SEARCH ----
-app.post('/api/planner/dsa/buses/search', async (req, res) => {
+app.post(['/api/planner/dsa/buses/search', '/api/dsa/buses/search'], async (req, res) => {
   const result = await executeBusSearch(req.body);
   res.json(result);
 });
 
 // ---- 3. DSA HOTEL SEARCH ----
-app.post('/api/planner/dsa/hotels/search', async (req, res) => {
+app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (req, res) => {
   const { city, checkIn, checkOut, rooms = 1, adults = 2, nights = 1 } = req.body;
   let rawResults = [];
   let traceId = null;
@@ -1297,7 +1297,7 @@ app.post('/api/planner/dsa/hotels/search', async (req, res) => {
 
 
 // ---- 4. DSA AUTO TRANSPORT FOR AI PLANNER ----
-app.post('/api/planner/dsa/auto-transport', async (req, res) => {
+app.post(['/api/planner/dsa/auto-transport', '/api/dsa/auto-transport'], async (req, res) => {
   const { from, to, date, mode } = req.body;
   try {
     const rDate = new Date(new Date(date).getTime() + 4 * 86400000).toISOString().split('T')[0];
@@ -1334,7 +1334,7 @@ app.post('/api/planner/dsa/auto-transport', async (req, res) => {
 // ---- 5. DSA HOTELS ALONG ROUTE ----
 // Takes polyline coords, finds 4 midway points at 1/5, 2/5, 3/5, 4/5 of the route
 // Reverse-geocodes each point, matches city in hotel_city_code_special.json, fetches live hotels
-app.post('/api/planner/dsa/hotels/along-route', async (req, res) => {
+app.post(['/api/planner/dsa/hotels/along-route', '/api/dsa/hotels/along-route'], async (req, res) => {
   const { polyline, checkIn, checkOut, rooms = 1, adults = 2, nights = 2 } = req.body;
   console.log('[along-route] Request received with polyline length:', polyline?.length);
   if (!polyline || polyline.length < 2) {

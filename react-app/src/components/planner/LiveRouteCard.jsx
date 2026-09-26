@@ -119,12 +119,14 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
           // Pin hotel to the stop's geocoded coordinates so it's ON the route
           const stopCoord = geocoded[idx] || geocoded[geocoded.length - 1];
           const best = res.results[0];
-          dHotels.push({
-            ...best,
-            lat: stopCoord.lat,
-            lng: stopCoord.lng,
-            routePoint: false,
-          });
+          if (best) {
+            dHotels.push({
+              ...best,
+              lat: stopCoord?.lat || best.lat || 0,
+              lng: stopCoord?.lng || best.lng || 0,
+              routePoint: false,
+            });
+          }
         }
       });
       setDestHotels(dHotels);

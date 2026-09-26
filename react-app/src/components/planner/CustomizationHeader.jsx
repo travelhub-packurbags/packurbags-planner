@@ -21,7 +21,7 @@ export default function CustomizationHeader({ currentStep, setStep, wizardData, 
     { id: 6, label: '6. Review & Confirm', icon: faCheckDouble },
   ];
 
-  const totalCost = calculateTotalCost();
+  const totalCost = typeof calculateTotalCost === 'function' ? (calculateTotalCost() || 0) : 0;
 
   return (
     <div className="sticky top-16 z-40 bg-[#121619]/95 backdrop-blur-md text-white border-b border-white/10 shadow-xl px-4 py-3">
@@ -71,22 +71,22 @@ export default function CustomizationHeader({ currentStep, setStep, wizardData, 
 
           {/* Quick Selection Summary Badges */}
           <div className="hidden lg:flex items-center gap-2 border-l border-white/10 pl-4 text-[11px] text-gray-300">
-            {wizardData.selectedPlaces.length > 0 && (
+            {(wizardData?.selectedPlaces?.length || 0) > 0 && (
               <span className="bg-white/10 px-2 py-0.5 rounded-md font-semibold">
                 📍 {wizardData.selectedPlaces.length} Spots
               </span>
             )}
-            {wizardData.selectedHotel && (
+            {wizardData?.selectedHotel && (
               <span className="bg-white/10 px-2 py-0.5 rounded-md font-semibold line-clamp-1 max-w-[120px]">
                 🏨 {wizardData.selectedHotel.property_name || wizardData.selectedHotel.name}
               </span>
             )}
-            {wizardData.selectedRide && (
+            {wizardData?.selectedRide && (
               <span className="bg-white/10 px-2 py-0.5 rounded-md font-semibold">
                 🚘 Ride Booked
               </span>
             )}
-            {(wizardData.selectedCafes.length > 0 || wizardData.selectedRestaurants.length > 0) && (
+            {((wizardData?.selectedCafes?.length || 0) > 0 || (wizardData?.selectedRestaurants?.length || 0) > 0) && (
               <span className="bg-white/10 px-2 py-0.5 rounded-md font-semibold">
                 🍽️ Dining Reserved
               </span>
