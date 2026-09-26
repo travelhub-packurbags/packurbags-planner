@@ -16,6 +16,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { generateTripPlan } from '../services/gemini';
 import { searchPlaces, geocodeCity } from '../services/places';
+import { geocodeCityORS } from '../services/orsPlaces';
 import { getRoute } from '../services/routing';
 import useAppStore from '../stores/useAppStore';
 import TripOutput from '../components/planner/TripOutput';
@@ -208,104 +209,127 @@ export default function ScheduleTrip() {
     return Math.max(1, diff);
   };
 
-  // Check if travel mode involves road/driving transit
-  const isRoadTripMode = (mode = '') => {
+  // ── Travel mode helpers ───────────────────────────────────────────
+  const getTravelModeType = (mode = '') => {
     const m = String(mode).toLowerCase();
-    return m.includes('car') || m.includes('bus') || m.includes('coach') ||
-           m.includes('bike') || m.includes('drive') || m.includes('vehicle') ||
-           m.includes('personal') || m.includes('rental') || m.includes('road');
+    if (m.includes('flight') || m.includes('plane') || m.includes('air')) return 'flight';
+    if (m.includes('train') || m.includes('rail') || m.includes('express') || m.includes('metro')) return 'train';
+    if (m.includes('bike') || m.includes('motorcycle') || m.includes('scooter') || m.includes('2-wheel')) return 'bike';
+    if (m.includes('bus') || m.includes('coach') || m.includes('volvo')) return 'bus';
+    if (m.includes('car') || m.includes('personal') || m.includes('vehicle') || m.includes('rental') || m.includes('drive') || m.includes('road')) return 'car';
+    return 'other'; // unknown → skip road check
   };
 
-  // Validate Trip Duration for road travel (max 8-10 hours travel per day)
+  // Max safe driving hours per day per mode
+  const MAX_HOURS_PER_DAY = { car: 10, bus: 8, bike: 7, train: 0, flight: 0, other: 10 };
+
+  // Fuel cost per km per mode (car: 15 km/l, bike: 40 km/l, bus: shared so 0 personal cost)
+  const calcFuel = (distKm, modeType) => {
+    if (modeType === 'car') return Math.round((distKm / 15) * 96);
+    if (modeType === 'bike') return Math.round((distKm / 40) * 96);
+    return 0;
+  };
+
+  // Geocode using ORS first (OpenStreetMap — works for all Indian cities), fallback to Google
+  const geocodeBestEffort = async (cityName) => {
+    const orsResult = await geocodeCityORS(cityName);
+    if (orsResult) return orsResult;
+    return geocodeCity(cityName); // Google Places fallback
+  };
+
+  // Validate Trip Duration for road travel (max 8–10 hours travel per day)
   const checkTripDuration = async (currentParams = params) => {
     const fromCity = (currentParams.fromCity || 'Delhi').trim();
-    const toCity = (currentParams.locations || 'Mumbai').split(',')[0].trim();
-    const mode = currentParams.mode || '';
-
-    if (!isRoadTripMode(mode)) {
-      return { ok: true, travelDays: 0, routeInfo: null };
-    }
-
+    const toCity   = (currentParams.locations || 'Mumbai').split(',')[0].trim();
+    const modeType = getTravelModeType(currentParams.mode || '');
     const totalDays = calculateTotalDays(currentParams);
 
-    let distanceKm = 0;
+    // Flight / Train — no road-distance check; always valid
+    if (modeType === 'flight' || modeType === 'train') {
+      return { ok: true, travelDays: 0, routeInfo: null, modeType };
+    }
+
+    let distanceKm   = 0;
     let drivingHours = 0;
     let durationDisplay = '';
     let routeInfo = null;
 
     try {
+      // Primary: ORS geocoding (OpenStreetMap, covers every Indian city)
+      // Fallback: Google Places geocoding
       const [fromCoords, toCoords] = await Promise.all([
-        geocodeCity(fromCity),
-        geocodeCity(toCity)
+        geocodeBestEffort(fromCity),
+        geocodeBestEffort(toCity),
       ]);
 
       if (fromCoords && toCoords) {
         try {
           const r = await getRoute([[fromCoords.lng, fromCoords.lat], [toCoords.lng, toCoords.lat]]);
           if (r && r.durationHours) {
-            routeInfo = r;
-            distanceKm = r.distanceKm || Math.round((r.distanceMeters || 0) / 1000);
+            routeInfo    = r;
+            distanceKm   = r.distanceKm || Math.round((r.distanceMeters || 0) / 1000);
             drivingHours = r.durationHours;
             durationDisplay = r.durationDisplay || `${Math.round(drivingHours)} hrs`;
           }
         } catch (err) {
-          console.warn('[checkTripDuration] Route calculation fallback:', err);
+          console.warn('[checkTripDuration] ORS route failed, using haversine:', err.message);
         }
 
-        if (!drivingHours) {
-          const R = 6371;
+        // Haversine fallback if ORS route timed out / failed
+        if (!drivingHours && fromCoords && toCoords) {
           const dLat = (toCoords.lat - fromCoords.lat) * Math.PI / 180;
           const dLon = (toCoords.lng - fromCoords.lng) * Math.PI / 180;
-          const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          const a = Math.sin(dLat / 2) ** 2 +
                     Math.cos(fromCoords.lat * Math.PI / 180) * Math.cos(toCoords.lat * Math.PI / 180) *
-                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          const straightKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-          distanceKm = Math.round(straightKm * 1.28);
-          drivingHours = Math.round((distanceKm / 55) * 10) / 10;
+                    Math.sin(dLon / 2) ** 2;
+          const straightKm = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+          distanceKm = Math.round(straightKm * 1.3); // road vs straight-line factor
+          const avgSpeed = modeType === 'bike' ? 45 : modeType === 'bus' ? 50 : 60;
+          drivingHours = distanceKm / avgSpeed;
           const h = Math.floor(drivingHours);
           const m = Math.round((drivingHours % 1) * 60);
           durationDisplay = `${h}h ${m}m`;
-          routeInfo = { distanceKm, durationHours: drivingHours, durationDisplay };
+          routeInfo = { distanceKm, durationHours: drivingHours, durationDisplay, source: 'haversine' };
         }
       }
     } catch (err) {
       console.warn('[checkTripDuration] Geocoding error:', err);
     }
 
-    // Well-known Indian intercity distance fallback if geocoding completely failed
-    if (!drivingHours && fromCity.toLowerCase().includes('delhi') && toCity.toLowerCase().includes('mumbai')) {
-      distanceKm = 1415;
-      drivingHours = 24.5;
-      durationDisplay = '24h 30m';
-      routeInfo = { distanceKm, durationHours: drivingHours, durationDisplay };
-    }
+    if (!distanceKm) return { ok: true, travelDays: 0, routeInfo: null };
 
-    // Safety rule: max 8-10 hours of driving possible per day
-    if (drivingHours >= 8) {
-      const travelDays = Math.ceil(drivingHours / 8);
-      const minDays = (travelDays * 2) + 2; // Round-trip transit days + min 2 days at destination
+    const fuelCostInr  = calcFuel(distanceKm, modeType);
+    if (routeInfo) routeInfo.fuelCostInr = fuelCostInr;
 
-      if (totalDays <= minDays) {
-        return {
-          ok: false,
-          minDays,
-          travelDays,
-          totalDays,
-          fromCity,
-          toCity,
-          distanceKm,
-          drivingHours: durationDisplay || `${drivingHours.toFixed(1)} hrs`,
-          routeInfo
-        };
-      }
+    const maxHours  = MAX_HOURS_PER_DAY[modeType] || 10;
+    const travelDays = Math.ceil(drivingHours / maxHours);
+    const minDays    = (travelDays * 2) + 2; // round-trip travel + at least 2 days at destination
+
+    if (drivingHours >= maxHours && totalDays <= minDays) {
+      return {
+        ok: false,
+        minDays, travelDays, totalDays,
+        fromCity, toCity,
+        distanceKm,
+        drivingHours: durationDisplay || `${drivingHours.toFixed(1)} hrs`,
+        fuelCostInr,
+        maxHoursPerDay: maxHours,
+        modeType,
+        routeInfo,
+      };
     }
 
     return {
       ok: true,
-      travelDays: drivingHours >= 8 ? Math.ceil(drivingHours / 8) : 0,
-      routeInfo
+      travelDays: drivingHours >= maxHours ? travelDays : 0,
+      fuelCostInr,
+      distanceKm,
+      drivingHours,
+      durationDisplay,
+      routeInfo,
     };
   };
+
 
   // Form Submit on Page 1
   const handleInputSubmit = async (e) => {
@@ -1455,12 +1479,20 @@ export default function ScheduleTrip() {
                 </div>
 
                 {/* Explanatory Message */}
-                <p className="text-xs text-gray-600 leading-relaxed mb-6">
-                  Based on highway safety guidelines (maximum 8–10 hours driving per day), traveling between {durationModalData.fromCity} and {durationModalData.toCity} requires 
-                  <strong className="text-gray-900"> {durationModalData.travelDays} days each way </strong> 
-                  ({durationModalData.travelDays * 2} days total on the road), plus time to explore the destination. 
-                  Your current schedule of {durationModalData.totalDays} days is not enough. Please change your dates to at least <strong className="text-red-700">{durationModalData.minDays} days</strong> on the first page, or switch to Flight/Train.
+                <p className="text-xs text-gray-600 leading-relaxed mb-4">
+                  Based on safety guidelines (maximum <strong>{durationModalData.maxHoursPerDay || 8}–{(durationModalData.maxHoursPerDay || 8) + 2} hours</strong> of{' '}
+                  {durationModalData.modeType === 'bus' ? 'bus' : durationModalData.modeType === 'bike' ? 'riding' : 'driving'} per day),
+                  traveling between {durationModalData.fromCity} and {durationModalData.toCity} requires{' '}
+                  <strong className="text-gray-900">{durationModalData.travelDays} days each way</strong>{' '}
+                  ({durationModalData.travelDays * 2} days total), plus time to explore the destination.{' '}
+                  Your current schedule of {durationModalData.totalDays} days is not enough. Change your dates to at least{' '}
+                  <strong className="text-red-700">{durationModalData.minDays} days</strong>, or switch to Flight/Train.
                 </p>
+                {durationModalData.fuelCostInr > 0 && (
+                  <p className="text-xs text-gray-500 mb-5">
+                    💰 Estimated fuel cost (one way): ₹{durationModalData.fuelCostInr.toLocaleString('en-IN')}
+                  </p>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3">
