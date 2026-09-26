@@ -173,19 +173,19 @@ export default function StepTransport({
 
     // Fetch BOTH directions in parallel — independent settle
     const [fOut, fRet, bOut, bRet] = await Promise.allSettled([
-      fetch(`${BACKEND_URL}/api/dsa/flights/search`, {
+      fetch(`${BACKEND_URL}/api/planner/dsa/flights/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: fromCity, to: destination, date: flightDate, adults: travellers || 1 })
       }).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/dsa/flights/search`, {
+      fetch(`${BACKEND_URL}/api/planner/dsa/flights/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: destination, to: fromCity, date: returnDate, adults: travellers || 1 })
       }).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/dsa/buses/search`, {
+      fetch(`${BACKEND_URL}/api/planner/dsa/buses/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: fromCity, to: destination, date: flightDate })
       }).then(r => r.json()),
-      fetch(`${BACKEND_URL}/api/dsa/buses/search`, {
+      fetch(`${BACKEND_URL}/api/planner/dsa/buses/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ from: destination, to: fromCity, date: returnDate })
       }).then(r => r.json()),

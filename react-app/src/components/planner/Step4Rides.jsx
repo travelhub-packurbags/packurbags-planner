@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faCarSide, 
@@ -115,7 +115,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
               <FontAwesomeIcon icon={faCarSide} /> Booked Transport Rides ({selectedRides.length})
             </h4>
             <span className="text-xs text-white font-bold">
-              Total Ride Cost: â‚¹{selectedRides.reduce((s, r) => s + r.price, 0).toLocaleString()}
+              Total Ride Cost: ₹{selectedRides.reduce((s, r) => s + r.price, 0).toLocaleString()}
             </span>
           </div>
 
@@ -123,9 +123,9 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
             {selectedRides.map(r => (
               <div key={r.ride_id} className="bg-white/5 p-3 rounded-2xl border border-white/10 text-xs flex justify-between items-center">
                 <div>
-                  <span className="text-[10px] text-[#D4B15A] font-bold">{r.vehicle_category} â€¢ {r.booking_type}</span>
+                  <span className="text-[10px] text-[#D4B15A] font-bold">{r.vehicle_category} • {r.booking_type}</span>
                   <h5 className="font-bold text-white text-sm">{r.vehicle_model}</h5>
-                  <p className="text-[11px] text-gray-400">ðŸ“ {r.tourist_place || r.city} â€¢ â‚¹{r.price.toLocaleString()}</p>
+                  <p className="text-[11px] text-gray-400">📍 {r.tourist_place || r.city} • ₹{r.price.toLocaleString()}</p>
                 </div>
                 <button 
                   onClick={() => onToggleRide(r)}
@@ -185,7 +185,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
                   Max Price
                 </label>
-                <span className="text-xs font-extrabold text-[#D4B15A]">â‚¹{maxPrice.toLocaleString()}</span>
+                <span className="text-xs font-extrabold text-[#D4B15A]">₹{maxPrice.toLocaleString()}</span>
               </div>
               <input 
                 type="range"
@@ -255,7 +255,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                       <div className="flex justify-between items-start mb-2">
                         <div>
                           <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A] bg-[#D4B15A]/10 px-2.5 py-0.5 rounded-md">
-                            {ride.vehicle_category} â€¢ {ride.ride_type}
+                            {ride.vehicle_category} • {ride.ride_type}
                           </span>
                           <h4 className="text-lg font-bold text-gray-900 mt-1 group-hover:text-[#D4B15A] transition-colors">
                             {ride.vehicle_model}
@@ -270,7 +270,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                       </div>
 
                       <p className="text-xs text-gray-500 mb-3">
-                        ðŸ“ Destination: <strong>{ride.tourist_place || ride.city}</strong> â€¢ {ride.seating_capacity} Seats
+                        📍 Destination: <strong>{ride.tourist_place || ride.city}</strong> • {ride.seating_capacity} Seats
                       </p>
 
                       <div className="flex items-center gap-4 mb-4 text-xs">
@@ -283,7 +283,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
 
                       <div className="mb-4 bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center">
                         <span className="text-xs text-gray-500 font-medium">{ride.booking_type}</span>
-                        <span className="text-xl font-extrabold text-gray-900">â‚¹{ride.price.toLocaleString()}</span>
+                        <span className="text-xl font-extrabold text-gray-900">₹{ride.price.toLocaleString()}</span>
                       </div>
                     </div>
 
@@ -304,7 +304,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                             : 'bg-[#121619] hover:bg-[#1e2429] text-[#D4B15A]'
                         }`}
                       >
-                        {isSelected ? 'Booked âœ“' : '+ Add Ride'}
+                        {isSelected ? 'Booked ✓' : '+ Add Ride'}
                       </button>
                     </div>
 
@@ -352,7 +352,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
             
             <div className="bg-[#121619] text-white p-6 relative">
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#D4B15A] bg-white/10 px-2.5 py-1 rounded-md mb-1 inline-block">
-                Ride ID: {activeRideModal.ride_id} â€¢ {activeRideModal.vehicle_category}
+                Ride ID: {activeRideModal.ride_id} • {activeRideModal.vehicle_category}
               </span>
               <h3 className="text-2xl font-bold text-white font-display">
                 {activeRideModal.vehicle_model}
@@ -374,11 +374,11 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                 <div>
                   <span className="text-gray-400 uppercase font-semibold text-[10px] block">Duration & Distance</span>
-                  <span className="font-bold text-gray-900 text-sm">{activeRideModal.duration_hours} hrs â€¢ {activeRideModal.distance_covered_km} km</span>
+                  <span className="font-bold text-gray-900 text-sm">{activeRideModal.duration_hours} hrs • {activeRideModal.distance_covered_km} km</span>
                 </div>
                 <div>
                   <span className="text-gray-400 uppercase font-semibold text-[10px] block">Pickup & Drop</span>
-                  <span className="font-bold text-gray-900 text-sm">{activeRideModal.pickup_location_type} â†’ {activeRideModal.drop_location_type}</span>
+                  <span className="font-bold text-gray-900 text-sm">{activeRideModal.pickup_location_type} → {activeRideModal.drop_location_type}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 uppercase font-semibold text-[10px] block">Hotel Dropoff</span>
@@ -392,7 +392,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                     <FontAwesomeIcon icon={faUserTie} className="text-[#D4B15A]" /> Driver & Language
                   </h4>
                   <p><strong>Driver Included:</strong> {activeRideModal.driver_included}</p>
-                  <p><strong>Driver Rating:</strong> {activeRideModal.driver_rating} â˜…</p>
+                  <p><strong>Driver Rating:</strong> {activeRideModal.driver_rating} ★</p>
                   <p><strong>Languages Spoken:</strong> {activeRideModal.driver_languages}</p>
                   <p><strong>Estimated Arrival:</strong> {activeRideModal.estimated_arrival}</p>
                 </div>
@@ -402,8 +402,8 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                     <FontAwesomeIcon icon={faGasPump} className="text-[#D4B15A]" /> Fuel & Extra Charges
                   </h4>
                   <p><strong>Fuel Included:</strong> {activeRideModal.fuel_included}</p>
-                  <p><strong>Extra Km Charge:</strong> â‚¹{activeRideModal.extra_km_charge}/km</p>
-                  <p><strong>Extra Hour Charge:</strong> â‚¹{activeRideModal.extra_hour_charge}/hr</p>
+                  <p><strong>Extra Km Charge:</strong> ₹{activeRideModal.extra_km_charge}/km</p>
+                  <p><strong>Extra Hour Charge:</strong> ₹{activeRideModal.extra_hour_charge}/hr</p>
                 </div>
               </div>
 
@@ -454,7 +454,7 @@ export default function Step4Rides({ destination, selectedRides = [], onToggleRi
                     : 'bg-[#121619] text-[#D4B15A]'
                 }`}
               >
-                {selectedRides.some(r => r.ride_id === activeRideModal.ride_id) ? 'Booked âœ“' : '+ Add Ride'}
+                {selectedRides.some(r => r.ride_id === activeRideModal.ride_id) ? 'Booked ✓' : '+ Add Ride'}
               </button>
             </div>
 

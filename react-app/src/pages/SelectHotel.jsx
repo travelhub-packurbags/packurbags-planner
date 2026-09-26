@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faStar } from '@fortawesome/free-solid-svg-icons';
@@ -79,7 +79,7 @@ export default function SelectHotel() {
         <div className="space-y-8">
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-4">
-              Max Price: â‚¹{priceRange.toLocaleString()} / night
+              Max Price: ₹{priceRange.toLocaleString()} / night
             </label>
             <input 
               type="range" 

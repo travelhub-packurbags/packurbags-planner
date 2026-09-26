@@ -35,7 +35,8 @@ async function getRouteWaypoints(polylineCoords) {
 }
 
 
-// All Gemini calls go through the backend proxy -- no key in the browser bundle.
+// All Gemini calls go through the backend proxy -- no key in the browser bundle.
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
 
 /**

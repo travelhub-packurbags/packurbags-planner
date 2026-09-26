@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import FlightCard from '../components/flight/FlightCard';
 import FlightFilters from '../components/flight/FlightFilters';

@@ -128,7 +128,7 @@ export default function DSAExamples() {
 
   useEffect(() => {
     // Check API status on mount
-    fetch(`${BACKEND_URL}/api/dsa/status`)
+    fetch(`${BACKEND_URL}/api/planner/dsa/status`)
       .then(r => r.json())
       .then(d => setApiStatus(d.results))
       .catch(() => {});
@@ -137,7 +137,7 @@ export default function DSAExamples() {
   const runFlight = async () => {
     setFlightStatus('loading'); setFlightError(null); setFlightResult(null);
     try {
-      const r = await fetch(`${BACKEND_URL}/api/dsa/flights/search`, {
+      const r = await fetch(`${BACKEND_URL}/api/planner/dsa/flights/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(FLIGHT_EXAMPLE),
       }).then(r => r.json());
@@ -152,7 +152,7 @@ export default function DSAExamples() {
   const runBus = async () => {
     setBusStatus('loading'); setBusError(null); setBusResult(null);
     try {
-      const r = await fetch(`${BACKEND_URL}/api/dsa/buses/search`, {
+      const r = await fetch(`${BACKEND_URL}/api/planner/dsa/buses/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(BUS_EXAMPLE),
       }).then(r => r.json());
@@ -167,7 +167,7 @@ export default function DSAExamples() {
   const runHotel = async () => {
     setHotelStatus('loading'); setHotelError(null); setHotelResult(null);
     try {
-      const r = await fetch(`${BACKEND_URL}/api/dsa/hotels/search`, {
+      const r = await fetch(`${BACKEND_URL}/api/planner/dsa/hotels/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(HOTEL_EXAMPLE),
       }).then(r => r.json());
@@ -227,7 +227,7 @@ export default function DSAExamples() {
           error={flightError}
           onRun={runFlight}
         >
-          POST /api/dsa/flights/search<br />
+          POST /api/planner/dsa/flights/search<br />
           {`{ "from": "${FLIGHT_EXAMPLE.from}", "to": "${FLIGHT_EXAMPLE.to}", "date": "${FLIGHT_EXAMPLE.date}", "adults": ${FLIGHT_EXAMPLE.adults} }`}
         </TestPanel>
 
@@ -240,7 +240,7 @@ export default function DSAExamples() {
           error={busError}
           onRun={runBus}
         >
-          POST /api/dsa/buses/search<br />
+          POST /api/planner/dsa/buses/search<br />
           {`{ "from": "${BUS_EXAMPLE.from}", "to": "${BUS_EXAMPLE.to}", "date": "${BUS_EXAMPLE.date}" }`}
         </TestPanel>
 
@@ -253,7 +253,7 @@ export default function DSAExamples() {
           error={hotelError}
           onRun={runHotel}
         >
-          POST /api/dsa/hotels/search<br />
+          POST /api/planner/dsa/hotels/search<br />
           {`{ "city": "${HOTEL_EXAMPLE.city}", "checkIn": "${HOTEL_EXAMPLE.checkIn}", "checkOut": "${HOTEL_EXAMPLE.checkOut}", "rooms": ${HOTEL_EXAMPLE.rooms}, "adults": ${HOTEL_EXAMPLE.adults} }`}
         </TestPanel>
 

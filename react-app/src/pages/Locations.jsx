@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import WeatherIcon from '../components/global/WeatherIcon';
@@ -87,7 +87,7 @@ export default function Locations() {
               </div>
               {loc.heat_score > 0.8 && (
                 <div className="absolute top-4 left-4 z-[50] bg-[#FFAA00] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg">
-                  ðŸ”¥ Trending
+                  🔥 Trending
                 </div>
               )}
               

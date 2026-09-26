@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import VendorCard from '../components/bus/VendorCard';
 import BusFilters from '../components/bus/BusFilters';

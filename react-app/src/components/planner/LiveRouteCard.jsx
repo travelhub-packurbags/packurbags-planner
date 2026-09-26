@@ -100,7 +100,7 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
 
       // 3. Fetch destination hotels from live DSA
       const cityFetches = currentCities.map(c =>
-        fetch(`${BACKEND_URL}/api/dsa/hotels/search`, {
+        fetch(`${BACKEND_URL}/api/planner/dsa/hotels/search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ city: c, checkIn, checkOut, rooms: 1, adults: 2, nights: 2 })
@@ -135,7 +135,7 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
         const step = Math.max(1, Math.floor(poly.length / 300));
         const sampled = poly.filter((_, i) => i % step === 0);
 
-        const routeRes = await fetch(`${BACKEND_URL}/api/dsa/hotels/along-route`, {
+        const routeRes = await fetch(`${BACKEND_URL}/api/planner/dsa/hotels/along-route`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ polyline: sampled, checkIn, checkOut, rooms: 1, adults: 2, nights: 2 })

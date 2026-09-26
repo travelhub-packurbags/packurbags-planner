@@ -166,7 +166,7 @@ export default function LiveRouteModal({ isOpen, onClose, fromCity, destinations
         allCitiesToFetch.map(c => {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 8000); // hard 8s limit
-          return fetch(`${BACKEND_URL}/api/dsa/hotels/search`, {
+          return fetch(`${BACKEND_URL}/api/planner/dsa/hotels/search`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ city: c, checkIn: checkInDate, checkOut: checkOutDate, rooms: 1, adults: 2, nights: 2 }),

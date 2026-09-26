@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faStar, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
@@ -245,7 +245,7 @@ export default function BookingGrid() {
           {/* Price Slider */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-4">
-              Max Price: â‚¹{priceRange}
+              Max Price: ₹{priceRange}
             </label>
             <input 
               type="range" 
@@ -327,7 +327,7 @@ export default function BookingGrid() {
                 onClick={() => { setSelectedBooking(null); setBookingConfirmed(false); }}
                 className="text-gray-400 hover:text-gray-600 font-medium text-sm transition-colors cursor-pointer"
               >
-                âœ• Cancel
+                ✕ Cancel
               </button>
             </div>
 
@@ -335,12 +335,12 @@ export default function BookingGrid() {
             {hotelId && type !== 'hotels' && (
               <div className="mb-6 p-4 bg-[#D4B15A]/10 border border-[#D4B15A]/20 rounded-2xl flex justify-between items-center">
                 <div>
-                  <span className="text-[10px] font-bold text-[#D4B15A] uppercase tracking-wider block mb-1">ðŸ¨ Accommodation reservation</span>
+                  <span className="text-[10px] font-bold text-[#D4B15A] uppercase tracking-wider block mb-1">🏨 Accommodation reservation</span>
                   <p className="font-bold text-gray-900 text-sm">{hotelName}</p>
                   <p className="text-[11px] text-gray-500">Stay from {selectedBooking.fromDate} to {selectedBooking.toDate}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-extrabold text-gray-900 text-sm">â‚¹{hotelPrice.toLocaleString()} / night</p>
+                  <p className="font-extrabold text-gray-900 text-sm">₹{hotelPrice.toLocaleString()} / night</p>
                 </div>
               </div>
             )}
@@ -356,7 +356,7 @@ export default function BookingGrid() {
 
               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
                 <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Schedule</p>
-                <p className="font-bold text-gray-900 mt-1">{selectedBooking.from} â†’ {selectedBooking.to}</p>
+                <p className="font-bold text-gray-900 mt-1">{selectedBooking.from} → {selectedBooking.to}</p>
                 <p className="text-xs text-gray-500 mt-1">{selectedBooking.fromDate} to {selectedBooking.toDate}</p>
               </div>
 
@@ -364,7 +364,7 @@ export default function BookingGrid() {
                 <div>
                   <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Total Combined Price</p>
                   <p className="text-2xl font-extrabold text-gray-900 mt-0.5">
-                    â‚¹{totalPrice.toLocaleString()}
+                    ₹{totalPrice.toLocaleString()}
                   </p>
                 </div>
               </div>
@@ -373,7 +373,7 @@ export default function BookingGrid() {
             {bookingConfirmed ? (
               <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-emerald-800 flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">ðŸŽ‰</span>
+                  <span className="text-2xl">🎉</span>
                   <div>
                     <p className="font-bold">Booking Confirmed successfully!</p>
                     <p className="text-sm text-emerald-700">Check your email, WhatsApp, & SMS notifications.</p>
@@ -386,7 +386,7 @@ export default function BookingGrid() {
                     rel="noopener noreferrer" 
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors shadow-sm shrink-0"
                   >
-                    Download PDF Ticket ðŸ“„
+                    Download PDF Ticket 📄
                   </a>
                 )}
               </div>
@@ -403,7 +403,7 @@ export default function BookingGrid() {
                       Processing payment...
                     </>
                   ) : (
-                    `Pay Now â‚¹${totalPrice.toLocaleString()}`
+                    `Pay Now ₹${totalPrice.toLocaleString()}`
                   )}
                 </button>
                 <span className="text-xs text-gray-400">Secured via Razorpay/PhonePe Mock. By paying you agree to terms.</span>
@@ -480,7 +480,7 @@ export default function BookingGrid() {
                       <div>
                         <p className="text-xs text-gray-500 font-medium uppercase tracking-wider">Starting from</p>
                         <p className="text-2xl font-bold text-[#121619]">
-                          â‚¹{(item.price_per_night_inr || item.price_inr || item.price || (item.price_per_km ? item.price_per_km * 100 : 0)).toLocaleString()}
+                          ₹{(item.price_per_night_inr || item.price_inr || item.price || (item.price_per_km ? item.price_per_km * 100 : 0)).toLocaleString()}
                           <span className="text-sm font-normal text-gray-500"> {type === 'hotels' && '/ night'}</span>
                         </p>
                       </div>

@@ -533,7 +533,7 @@ export default function Step3Hotels({
         try {
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 12000);
-          const res = await fetch(`${BACKEND_URL}/api/dsa/hotels/search`, {
+          const res = await fetch(`${BACKEND_URL}/api/planner/dsa/hotels/search`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ city, checkIn, checkOut, rooms: 1, adults: travellers || 2, nights }),

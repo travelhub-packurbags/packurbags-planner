@@ -392,7 +392,7 @@ export default function ScheduleTrip() {
         const isFlight = modeStr.includes('flight');
         const isBus    = modeStr.includes('bus');
         if (isFlight || isBus) {
-          const transportRes = await fetch(`${BACKEND}/api/dsa/auto-transport`, {
+          const transportRes = await fetch(`${BACKEND}/api/planner/dsa/auto-transport`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -417,7 +417,7 @@ export default function ScheduleTrip() {
       try {
         const totalDays = check.totalDays || calculateTotalDays(params);
         const nights = totalDays > 1 ? totalDays - 1 : 1;
-        const hotelRes = await fetch(`${BACKEND}/api/dsa/hotels/search`, {
+        const hotelRes = await fetch(`${BACKEND}/api/planner/dsa/hotels/search`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
