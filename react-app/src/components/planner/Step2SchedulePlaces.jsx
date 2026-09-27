@@ -13,7 +13,7 @@ import {
 import { fetchWikipediaImage } from '../../services/wikipedia';
 import { saveSelectedImage, getSelectedImage } from '../../services/supabaseStorage';
 
-export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUpdateSchedule, onNext, onBack, totalDays = 3, outboundTransport = null, returnTransport = null }) {
+export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUpdateSchedule, onNext, onBack, totalDays = 3, outboundTransport = null, returnTransport = null, fromDate = '', tripCheckResult = null }) {
   const [placeImages, setPlaceImages] = useState({});
 
   const timeSlots = [
@@ -24,6 +24,21 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
   ];
 
   const daysList = Array.from({ length: totalDays }, (_, i) => `Day ${i + 1}`);
+
+  const checkIsClosed = (place, dayStr) => {
+    if (!place.weekly_off || place.weekly_off.toLowerCase() === 'none') return null;
+    if (!fromDate) return null;
+    const m = dayStr.match(/Day (\d+)/);
+    if (!m) return null;
+    const dayNum = parseInt(m[1], 10);
+    const date = new Date(fromDate);
+    date.setDate(date.getDate() + dayNum - 1);
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+    if (place.weekly_off.toLowerCase().includes(dayName.toLowerCase())) {
+      return dayName;
+    }
+    return null;
+  };
 
   // Fetch or retrieve missing place photos from 15-day storage or Wikipedia
   useEffect(() => {
@@ -111,6 +126,55 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
         </p>
       </div>
 
+      {/* Road Trip Schedule Explanation */}
+      {(() => {
+        let roadTripHours = 0;
+        let roadTripDays = 0;
+        if (outboundTransport && outboundTransport.code === 'SELF-DRIVE' && outboundTransport.duration) {
+          const match = outboundTransport.duration.match(/(\d+)h/);
+          if (match) {
+            roadTripHours = parseInt(match[1]);
+            roadTripDays = Math.ceil(roadTripHours / 8);
+          }
+        }
+        
+        if (roadTripDays > 1) {
+          return (
+            <div className="mb-6 bg-amber-50 text-amber-900 p-4 rounded-2xl border border-amber-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+              <div>
+                <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block mb-0.5">
+                  Road Trip Schedule
+                </span>
+                <p className="font-medium">
+                  Your road trip is {roadTripHours} hours long. Assuming 8 hours of safe driving per day, you need {roadTripDays - 1} overnight stops and will tentatively reach your destination by <strong className="text-amber-800">Day {roadTripDays} evening</strong>.
+                </p>
+              </div>
+              <span className="text-[11px] text-amber-700 bg-amber-100 px-3 py-1 rounded-lg border border-amber-300">
+                Schedule spots from Day {roadTripDays} (if time permits) or Day {roadTripDays + 1} onwards
+              </span>
+            </div>
+          );
+        } else if (tripCheckResult && tripCheckResult.travelDays > 0) {
+          return (
+            <div className="mb-6 bg-amber-50 text-amber-900 p-4 rounded-2xl border border-amber-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
+              <div>
+                <span className="text-[10px] font-extrabold text-amber-700 uppercase tracking-wider block mb-0.5">
+                  Tentative Arrival Schedule
+                </span>
+                <p className="font-medium">
+                  Based on a {tripCheckResult.drivingHours?.toFixed ? tripCheckResult.drivingHours.toFixed(1) : tripCheckResult.drivingHours} hour road trip traveling max {tripCheckResult.maxHoursPerDay} hours per day, 
+                  you will tentatively arrive on <strong className="text-amber-800">Day {(tripCheckResult.travelDays + 1)}</strong>.
+                </p>
+              </div>
+              <span className="text-[11px] text-amber-700 bg-amber-100 px-3 py-1 rounded-lg border border-amber-300">
+                Schedule spots from Day {(tripCheckResult.travelDays + 1)} onwards
+              </span>
+            </div>
+          );
+        }
+        return null;
+      })()}
+
       {/* Booked Transport Banner */}
       {(outboundTransport || returnTransport) && (
         <div className="mb-6 bg-[#121619] text-white p-4 rounded-2xl border border-[#D4B15A]/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs">
@@ -155,7 +219,6 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
                 {/* Floating Category & Index Badge (Image 4) */}
                 <div className="absolute -top-3 left-6 z-10 flex items-center gap-1.5">
                   <div className="bg-[#1f2937] text-white text-[10px] font-extrabold uppercase tracking-wider px-3 py-1 rounded-full shadow-md flex items-center gap-2">
-                    <span className="w-4 h-4 rounded-full bg-[#D4B15A] text-[#121619] inline-flex items-center justify-center text-[10px] font-black">{idx + 1}</span>
                     <span>{place.type || 'ATTRACTION'}</span>
                   </div>
                 </div>
@@ -177,12 +240,20 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
                     <h4 className="text-xl font-bold text-gray-900 leading-snug">
                       {place.name}
                     </h4>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 font-medium mt-1">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 font-medium mt-1">
                       <span>📍 {place.city ? `${place.city}, ${place.state || place.city}` : 'Destination'}</span>
                       <span>•</span>
                       <span className="bg-gray-100 text-gray-700 font-semibold px-2 py-0.5 rounded-md">
                         Approx {place.time_needed_to_visit_hrs || 5} hrs visit
                       </span>
+                      {(Number(place.entrance_fee_inr || place.entryFee || place.fee || 0) > 0) && (
+                        <>
+                          <span>•</span>
+                          <span className="bg-amber-50 text-amber-800 font-semibold px-2 py-0.5 rounded-md border border-amber-200">
+                            🎟️ ₹{Number(place.entrance_fee_inr || place.entryFee || place.fee || 0)} Entry
+                          </span>
+                        </>
+                      )}
                     </div>
                     <p className="text-xs text-gray-600 mt-2.5 line-clamp-2 leading-relaxed">
                       {place.description || `An iconic destination landmark in ${place.city || 'the region'}, perfect for history lovers, sightseeing, and evening walks.`}
@@ -242,6 +313,19 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
                       {rec.note}
                     </p>
                   </div>
+                  
+                  {(() => {
+                    const closedDay = checkIsClosed(place, currentSched.day);
+                    if (closedDay) {
+                      return (
+                        <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3 text-xs">
+                          <p className="font-bold text-red-700">⚠️ Closed on {closedDay}s</p>
+                          <p className="text-red-600 mt-1 text-[11px]">This place is usually closed on {closedDay}s. Consider scheduling it on another day.</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
               </div>

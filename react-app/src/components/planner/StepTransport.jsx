@@ -63,10 +63,11 @@ function LiveSignalBadge({ isLive, loading }) {
 
 // Card component for flight/bus option
 function TransportCard({ opt, isSelected, onSelect, fromCity, toCity }) {
+  const isCalculating = opt.operator === 'Calculating Route...';
   return (
     <div
-      onClick={() => onSelect(opt)}
-      className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between min-h-[160px] ${
+      onClick={() => !isCalculating && onSelect(opt)}
+      className={`p-4 rounded-2xl border transition-all ${!isCalculating ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'} flex flex-col justify-between min-h-[160px] ${
         isSelected
           ? 'border-[#D4B15A] bg-amber-500/5 ring-2 ring-[#D4B15A]/30 shadow-md'
           : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -141,13 +142,17 @@ export default function StepTransport({
   onSelectReturn, 
   travellers = 2,
   onNext, 
-  onBack 
+  onBack,
+  isForeignTrip = false
 }) {
   const [outboundMode, setOutboundMode] = useState(outboundTransport?.type || 'flight');
   const [returnMode, setReturnMode] = useState(returnTransport?.type || 'flight');
 
   const [driveMetrics, setDriveMetrics] = useState({ roadKm: 0, durationStr: 'Calculating...', depTime: '06:00 AM', arrTime: 'Calculating...' });
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
+
+  // Custom departure time for Personal Vehicle (24hr format for input, display format separate)
+  const [customDepTime, setCustomDepTime] = useState('06:00'); // HH:MM 24hr
 
   // Live DSA state — separate loading per direction
   const [dsaFlightsOut, setDsaFlightsOut]   = useState([]);
@@ -229,13 +234,24 @@ export default function StepTransport({
       try {
         const routeData = await getRoute([c1, c2]);
         if (active && routeData) {
-          const totalHrs = Math.floor(routeData.totalMinutes / 60);
-          const days = Math.ceil(totalHrs / 24);
+          const totalHrs = routeData.totalMinutes / 60;
+          const days = Math.ceil(totalHrs / 8); // Max 8 hrs driving per day
+
+          // Calculate exact arrival time: depart 06:00 AM + drivingHours
+          const DEP_HOUR = 6; // 06:00 AM departure
+          const drivingHrsLastDay = totalHrs - ((days - 1) * 8); // hours driven on final day
+          const arrHour24 = DEP_HOUR + drivingHrsLastDay;
+          const arrHour = Math.floor(arrHour24);
+          const arrMin = Math.round((arrHour24 - arrHour) * 60);
+          const arrPeriod = arrHour >= 12 ? 'PM' : 'AM';
+          const arrHour12 = arrHour > 12 ? arrHour - 12 : (arrHour === 0 ? 12 : arrHour);
+          const arrTimeStr = `${String(arrHour12).padStart(2, '0')}:${String(arrMin).padStart(2, '0')} ${arrPeriod}${days > 1 ? ` (Day ${days})` : ''}`;
+
           setDriveMetrics({
             roadKm: routeData.distanceKm,
-            durationStr: `${routeData.durationDisplay}${totalHrs > 24 ? ` (~${days} Days Road Trip)` : ''}`,
+            durationStr: `${routeData.durationDisplay}${days > 1 ? ` (~${days} Days Road Trip)` : ''}`,
             depTime: '06:00 AM',
-            arrTime: totalHrs > 24 ? `06:00 AM (+${days}d)` : '09:00 PM'
+            arrTime: arrTimeStr
           });
         }
       } catch (err) { console.error('Drive metrics failed', err); }
@@ -245,11 +261,53 @@ export default function StepTransport({
     return () => { active = false; };
   }, [fromCity, destination, outboundMode, returnMode]);
 
+  // Compute arrival time string from 24hr depTime string + total driving hours
+  const computeArrival = (dep24, totalDrivingHours) => {
+    const [hStr, mStr] = dep24.split(':');
+    const depH = parseInt(hStr, 10);
+    const depM = parseInt(mStr, 10);
+    const totalMinutes = depH * 60 + depM + Math.round(totalDrivingHours * 60);
+    const days = Math.floor(totalMinutes / (8 * 60)); // days driven (8h/day max)
+    // Last day: minutes after 06:00 AM start
+    const lastDayDepMinutes = 6 * 60; // 06:00 AM on day 2+
+    let arrMinutes;
+    if (days === 0) {
+      // Single day trip — add duration directly to departure
+      arrMinutes = totalMinutes;
+    } else {
+      // Multi-day: last day departs 06:00, drives remaining hours
+      const remainingHours = totalDrivingHours - (days * 8);
+      arrMinutes = lastDayDepMinutes + Math.round(remainingHours * 60);
+    }
+    const arrH = Math.floor(arrMinutes / 60) % 24;
+    const arrM = arrMinutes % 60;
+    const period = arrH >= 12 ? 'PM' : 'AM';
+    const h12 = arrH > 12 ? arrH - 12 : (arrH === 0 ? 12 : arrH);
+    const dayLabel = days > 0 ? ` (Day ${days + 1})` : '';
+    return `${String(h12).padStart(2, '0')}:${String(arrM).padStart(2, '0')} ${period}${dayLabel}`;
+  };
+
+  // Format 24hr time to 12hr display
+  const fmt12 = (t24) => {
+    const [hStr, mStr] = t24.split(':');
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    const period = h >= 12 ? 'PM' : 'AM';
+    const h12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+  };
+
+  const totalDriveHours = driveMetrics.roadKm > 0 ? (driveMetrics.roadKm / 60) : 0;
+  const dynamicArrTime = !isLoadingMetrics && totalDriveHours > 0
+    ? computeArrival(customDepTime, totalDriveHours)
+    : driveMetrics.arrTime;
+
   const BIKE_OPT = (dir) => [{
     id: `${dir}-bk1`, type: 'bike',
     operator: isLoadingMetrics ? 'Calculating Route...' : `Personal Vehicle / Bike (${driveMetrics.roadKm} km)`,
     code: 'SELF-DRIVE',
-    depTime: driveMetrics.depTime, arrTime: driveMetrics.arrTime,
+    depTime: fmt12(customDepTime),
+    arrTime: dynamicArrTime,
     duration: isLoadingMetrics ? 'Loading...' : driveMetrics.durationStr,
     price: 0, seatsLeft: 99, baggage: 'Personal Luggage'
   }];
@@ -283,6 +341,17 @@ export default function StepTransport({
 
   return (
     <div className="w-full p-4 sm:p-6">
+
+      {/* Foreign Trip Banner */}
+      {isForeignTrip && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+          <span className="text-2xl">✈️🌍</span>
+          <div>
+            <p className="font-bold text-blue-800 text-sm">International Trip Detected</p>
+            <p className="text-blue-600 text-xs mt-0.5">Cross-border road travel is not possible. Only Flight options are available. Your itinerary will automatically include Visa requirements, currency exchange rates, and international travel tips.</p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -328,8 +397,8 @@ export default function StepTransport({
               <LiveSignalBadge isLive={outboundIsLive} loading={loadingOut} />
               <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
                 <ModeTab mode="flight" current={outboundMode} onChange={setOutboundMode} icon={<FontAwesomeIcon icon={faPlane} />} label="Flight" />
-                <ModeTab mode="bus"    current={outboundMode} onChange={setOutboundMode} icon={<FontAwesomeIcon icon={faBus} />}   label="Bus" />
-                <ModeTab mode="bike"   current={outboundMode} onChange={setOutboundMode} icon="🏍️"                                label="Self Drive" />
+                {!isForeignTrip && <ModeTab mode="bus"  current={outboundMode} onChange={setOutboundMode} icon={<FontAwesomeIcon icon={faBus} />} label="Bus" />}
+                {!isForeignTrip && <ModeTab mode="bike" current={outboundMode} onChange={setOutboundMode} icon="🚗" label="Self Drive" />}
               </div>
             </div>
           </div>
@@ -337,15 +406,40 @@ export default function StepTransport({
           {loadingOut && outboundMode !== 'bike' ? (
             <SkeletonCards />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {outboundOptions.map(opt => (
-                <TransportCard
-                  key={opt.id} opt={opt}
-                  isSelected={outboundTransport?.id === opt.id}
-                  onSelect={onSelectOutbound}
-                  fromCity={fromCity} toCity={destination}
-                />
-              ))}
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {outboundOptions.map(opt => (
+                  <TransportCard
+                    key={opt.id} opt={opt}
+                    isSelected={outboundTransport?.id === opt.id}
+                    onSelect={onSelectOutbound}
+                    fromCity={fromCity} toCity={destination}
+                  />
+                ))}
+              </div>
+              {outboundMode === 'bike' && !isLoadingMetrics && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🕐</span>
+                    <span className="text-sm font-bold text-amber-800">Custom Departure Time</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="time"
+                      value={customDepTime}
+                      onChange={e => setCustomDepTime(e.target.value)}
+                      className="border border-amber-300 rounded-xl px-3 py-2 text-sm font-bold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                    />
+                    <div className="text-xs text-amber-700">
+                      <span className="font-semibold">Departure:</span> {fmt12(customDepTime)}
+                      {totalDriveHours > 0 && (
+                        <span className="ml-2">→ <span className="font-semibold">Arrival:</span> {dynamicArrTime}</span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-amber-600 sm:ml-auto">Arrival time recalculates automatically based on route duration.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -366,8 +460,8 @@ export default function StepTransport({
               <LiveSignalBadge isLive={returnIsLive} loading={loadingRet} />
               <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
                 <ModeTab mode="flight" current={returnMode} onChange={setReturnMode} icon={<FontAwesomeIcon icon={faPlane} />} label="Flight" />
-                <ModeTab mode="bus"    current={returnMode} onChange={setReturnMode} icon={<FontAwesomeIcon icon={faBus} />}   label="Bus" />
-                <ModeTab mode="bike"   current={returnMode} onChange={setReturnMode} icon="🏍️"                                label="Self Drive" />
+                {!isForeignTrip && <ModeTab mode="bus"  current={returnMode} onChange={setReturnMode} icon={<FontAwesomeIcon icon={faBus} />} label="Bus" />}
+                {!isForeignTrip && <ModeTab mode="bike" current={returnMode} onChange={setReturnMode} icon="🚗" label="Self Drive" />}
               </div>
             </div>
           </div>

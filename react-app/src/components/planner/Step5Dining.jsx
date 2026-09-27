@@ -112,25 +112,7 @@ export default function Step5Dining({
           image: rest.image || getCuisineImage(rest.food_type || rest.cuisine || ''),
         }));
         setRestaurants(withImages);
-        toast.success(`Loaded ${withImages.length} restaurants! Fetching real photos...`);
-
-        // Fetch Serper photos sequentially
-        let loaded = 0;
-        for (const rest of withImages) {
-          const city = rest.city || finalCity;
-          const img = await fetchSerperImage(rest.name, city);
-          if (img) {
-            setRestaurantImages(prev => ({ ...prev, [`${rest.name}::${city}`]: img }));
-            loaded++;
-          }
-          await new Promise(r => setTimeout(r, 100)); // 100ms polite gap
-        }
-        
-        if (loaded > 0) {
-          toast.success(`📷 ${loaded} real restaurant photos loaded!`, {
-            position: 'bottom-right', autoClose: 3000,
-          });
-        }
+        toast.success(`Loaded ${withImages.length} restaurants!`);
       } else {
         toast.info("No highly-rated restaurants found via Google. Using dataset.");
       }
@@ -366,3 +348,6 @@ export default function Step5Dining({
     </div>
   );
 }
+
+
+

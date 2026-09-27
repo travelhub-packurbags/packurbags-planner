@@ -207,6 +207,17 @@ export async function getPlaceDetails(placeId) {
     const name = data.displayName?.text || 'Attraction';
     const lat  = data.location?.latitude  || 0;
     const lng  = data.location?.longitude || 0;
+
+    let weekly_off = 'None';
+    if (data.regularOpeningHours && data.regularOpeningHours.weekdayDescriptions) {
+      const closedDays = data.regularOpeningHours.weekdayDescriptions
+        .filter(desc => desc.toLowerCase().includes('closed'))
+        .map(desc => desc.split(':')[0].trim());
+      if (closedDays.length > 0) {
+        weekly_off = closedDays.join(', ');
+      }
+    }
+
     return {
       id: data.id || placeId, placeId: data.id || placeId,
       name, displayName: name, lat, lng,
@@ -216,6 +227,7 @@ export async function getPlaceDetails(placeId) {
       address: data.formattedAddress || '',
       websiteUri: data.websiteUri || null,
       photos: data.photos || [],
+      weekly_off,
       source: 'google',
     };
   } catch (err) {
@@ -529,86 +541,29 @@ export async function geocodeCity(cityName) {
  */
 export async function searchRestaurants(cityName) {
   try {
-    // Step 1: Geocode the city to get lat/lng using Nominatim (free, no key)
-    const geoRes = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=1`,
-      { headers: { 'Accept-Language': 'en', 'User-Agent': 'FirstflightTravels/1.0' } }
-    );
-    const geoData = await geoRes.json();
-    if (!geoData || geoData.length === 0) throw new Error('City not found');
+    const res = await fetch(`${BACKEND_URL}/v1/planner/places/restaurants?city=${encodeURIComponent(cityName)}`);
+    if (!res.ok) throw new Error('Backend restaurants proxy failed');
+    const data = await res.json();
+    if (data.code === 'PLANNER_UNAVAILABLE' || !data.places) return [];
 
-    const { lat, lon } = geoData[0];
-    const radius = 10000; // 10km radius
-
-    // Step 2: Query Overpass API for restaurants in the city
-    const overpassQuery = `
-      [out:json][timeout:20];
-      (
-        node["amenity"="restaurant"]["name"](around:${radius},${lat},${lon});
-        way["amenity"="restaurant"]["name"](around:${radius},${lat},${lon});
-      );
-      out body 60;
-    `;
-    const overpassRes = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      body: overpassQuery,
-    });
-
-    if (!overpassRes.ok) throw new Error('Overpass API failed');
-
-    const overpassData = await overpassRes.json();
-    let elements = overpassData.elements || [];
-
-    // Step 3: Filter & enrich elements
-    elements = elements.filter(e => e.tags && e.tags.name);
-
-    // Sort by having more tag info (better data quality)
-    elements.sort((a, b) => Object.keys(b.tags).length - Object.keys(a.tags).length);
-
-    // Limit to top 10
-    elements = elements.slice(0, 10);
-
-    // Food image pool for variety
-    const foodImages = [
-      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=600&q=80',
-      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=600&q=80',
-    ];
-
-    return elements.map((e, i) => {
-      const tags = e.tags;
-      const cuisine = tags.cuisine ? tags.cuisine.replace(/_/g, ' ') : 'Multi-cuisine';
-      const rating = parseFloat((3.8 + Math.random() * 1.2).toFixed(1)); // 3.8 â€“ 5.0
-      let price = 500;
-      if (tags['price:range'] === '$') price = 300;
-      else if (tags['price:range'] === '$$') price = 800;
-      else if (tags['price:range'] === '$$$') price = 1500;
-      else if (tags['price:range'] === '$$$$') price = 2500;
-
-      return {
-        id: `osm_${e.id}`,
-        name: tags.name,
-        city: cityName,
-        cuisine,
-        food_type: cuisine,
-        rating,
-        avg_rating: rating,
-        price,
-        area: tags['addr:suburb'] || tags['addr:neighbourhood'] || tags['addr:street'] || cityName,
-        image: foodImages[i % foodImages.length],
-        source: 'openstreetmap'
-      };
-    });
-
+    return data.places.map((place, idx) => ({
+      id:          `google_rest_${place.id || idx}`,
+      name:        place.displayName?.text || 'Restaurant',
+      city:        cityName,
+      cuisine:     place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Multi-cuisine',
+      food_type:   place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Multi-cuisine',
+      rating:      place.rating || 4.2,
+      price:       500, // default estimation
+      lat:         place.location?.latitude,
+      lng:         place.location?.longitude,
+      image:       place.photos?.length ? `${BACKEND_URL}/api/planner/places/photo?ref=${encodeURIComponent(place.photos[0].name)}&maxH=400` : null,
+      address:     place.formattedAddress,
+    }));
   } catch (err) {
-    console.error('Restaurant search (Overpass) failed:', err);
-    throw err;
+    console.warn('[searchRestaurants] Error:', err.message);
+    return [];
   }
 }
-
-
 const attractionsCache = new Map();
 
 /**
@@ -640,7 +595,7 @@ export function fetchGoogleAttractions(cityName) {
         description:          place.editorialSummary?.text || `A popular tourist attraction in ${cityName}.`,
         lat:                  place.location?.latitude,
         lng:                  place.location?.longitude,
-        image:                null,
+        image:                place.photos?.length ? `${BACKEND_URL}/api/planner/places/photo?ref=${encodeURIComponent(place.photos[0].name)}&maxH=600` : null,
         source:               'google',
       }));
     } catch (err) {
@@ -653,4 +608,6 @@ export function fetchGoogleAttractions(cityName) {
   attractionsCache.set(cityName, p);
   return p;
 }
+
+
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -37,6 +38,9 @@ import { saveSelectedImage, getSelectedImage, saveItinerarySnapshot } from '../s
 import { fetchWikipediaImage } from '../services/wikipedia';
 
 export default function ScheduleTrip() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [params, setParams] = useState(() => {
     const saved = sessionStorage.getItem('ff_trip_params');
     return saved ? JSON.parse(saved) : { 
@@ -60,6 +64,11 @@ export default function ScheduleTrip() {
   const [apiError, setApiError] = useState(null);
   const [validationError, setValidationError] = useState(null);
   const [durationModalData, setDurationModalData] = useState(null);
+  const [tripCheckResult, setTripCheckResult] = useState(() => {
+    const saved = sessionStorage.getItem('ff_trip_check_result');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isForeignTrip, setIsForeignTrip] = useState(false);
   const { addToast, addDraft } = useAppStore();
 
   const [fromSuggestions, setFromSuggestions] = useState([]);
@@ -70,13 +79,11 @@ export default function ScheduleTrip() {
 
   const isSelectingFromRef = useRef(false);
   const isSelectingDestRef = useRef(false);
-  // Prevent autocomplete firing on mount when values are pre-loaded from sessionStorage
-  const fromMountedRef = useRef(false);
-  const destMountedRef = useRef(false);
+  const [userDidTypeFrom, setUserDidTypeFrom] = useState(false);
+  const [userDidTypeDest, setUserDidTypeDest] = useState(false);
 
   useEffect(() => {
-    // Skip first run — value may be pre-filled from sessionStorage
-    if (!fromMountedRef.current) { fromMountedRef.current = true; return; }
+    if (!userDidTypeFrom) return;
     if (isSelectingFromRef.current) { isSelectingFromRef.current = false; return; }
     if (!params.fromCity.trim() || params.fromCity.trim().length < 2) {
       setFromSuggestions([]);
@@ -94,11 +101,10 @@ export default function ScheduleTrip() {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [params.fromCity]);
+  }, [params.fromCity, userDidTypeFrom]);
 
   useEffect(() => {
-    // Skip first run — value may be pre-filled from sessionStorage
-    if (!destMountedRef.current) { destMountedRef.current = true; return; }
+    if (!userDidTypeDest) return;
     if (isSelectingDestRef.current) { isSelectingDestRef.current = false; return; }
     if (!params.locations.trim() || params.locations.trim().length < 2) {
       setDestSuggestions([]);
@@ -162,6 +168,14 @@ export default function ScheduleTrip() {
   }, [wizardData]);
 
   useEffect(() => {
+    if (tripCheckResult) {
+      sessionStorage.setItem('ff_trip_check_result', JSON.stringify(tripCheckResult));
+    } else {
+      sessionStorage.removeItem('ff_trip_check_result');
+    }
+  }, [tripCheckResult]);
+
+  useEffect(() => {
     if (plan) {
       sessionStorage.setItem('ff_trip_plan', JSON.stringify(plan));
     } else {
@@ -169,7 +183,17 @@ export default function ScheduleTrip() {
     }
   }, [plan]);
 
-  const resetTripForm = () => {
+  useEffect(() => {
+    if (location.state?.reset) {
+      // Defer resetting to avoid setting state during render
+      setTimeout(() => {
+        resetTripForm();
+        navigate(location.pathname, { replace: true, state: {} });
+      }, 0);
+    }
+  }, [location.state, navigate]);
+
+  function resetTripForm() {
     setParams({ 
       fromCity: 'Delhi',
       locations: 'Mumbai', 
@@ -198,6 +222,8 @@ export default function ScheduleTrip() {
     sessionStorage.removeItem('ff_trip_wizard_step');
     sessionStorage.removeItem('ff_trip_wizard_data');
     sessionStorage.removeItem('ff_trip_plan');
+    sessionStorage.removeItem('ff_trip_check_result');
+    setTripCheckResult(null);
   };
 
   // Calculate Days count between fromDate and toDate
@@ -243,6 +269,25 @@ export default function ScheduleTrip() {
     const toCity   = (currentParams.locations || 'Mumbai').split(',')[0].trim();
     const modeType = getTravelModeType(currentParams.mode || '');
     const totalDays = calculateTotalDays(currentParams);
+
+    // ---- Foreign / Intercontinental Trip Detection ----
+    // India bounding box: lat 8-37, lng 68-97
+    const isInIndia = (lat, lng) => lat >= 6 && lat <= 38 && lng >= 68 && lng <= 98;
+    try {
+      const [fc, tc] = await Promise.all([geocodeBestEffort(fromCity), geocodeBestEffort(toCity)]);
+      if (fc && tc) {
+        const fromIsIndia = isInIndia(fc.lat, fc.lng);
+        const toIsIndia   = isInIndia(tc.lat, tc.lng);
+        if (!toIsIndia || (!fromIsIndia && toIsIndia)) {
+          setIsForeignTrip(true);
+          // For foreign trips, only flight is valid — skip road checks
+          return { ok: true, travelDays: 0, routeInfo: null, modeType, isForeignTrip: true };
+        } else {
+          setIsForeignTrip(false);
+        }
+      }
+    } catch (_) {}
+    // --------------------------------------------------
 
     // Flight / Train — no road-distance check; always valid
     if (modeType === 'flight' || modeType === 'train') {
@@ -339,7 +384,16 @@ export default function ScheduleTrip() {
       return;
     }
 
+    if (params.fromDate && params.toDate) {
+      if (new Date(params.toDate) < new Date(params.fromDate)) {
+        addToast({ type: 'error', message: 'Return date cannot be earlier than departure date.', title: 'Invalid Dates' });
+        return;
+      }
+    }
+
     const check = await checkTripDuration(params);
+    setTripCheckResult(check);
+
     if (!check.ok) {
       const msg = `Travel time too long! You need at least ${check.minDays} days for this distance (${check.travelDays} days each way). Please provide more days or switch travel mode.`;
       addToast({ type: 'error', message: msg, title: 'Trip Too Short for Road Travel' });
@@ -449,6 +503,7 @@ export default function ScheduleTrip() {
         routeInfo,
         liveTransport,
         liveHotels,
+        isForeignTrip
       });
 
       if (generated.error) {
@@ -587,7 +642,8 @@ export default function ScheduleTrip() {
         selectedRestaurants: adjustedRestaurants,
         outboundTransport: wizardData.outboundTransport,
         returnTransport: wizardData.returnTransport,
-        routeInfo
+        routeInfo,
+        isForeignTrip
       });
 
       if (generated.error) {
@@ -930,7 +986,10 @@ export default function ScheduleTrip() {
                     required
                     placeholder="e.g. Delhi, Mumbai, Bangalore, Jaipur"
                     value={params.fromCity}
-                    onChange={e => setParams({...params, fromCity: e.target.value})}
+                    onChange={e => {
+                      setUserDidTypeFrom(true);
+                      setParams({...params, fromCity: e.target.value});
+                    }}
                     className="w-full pl-12 pr-10 py-3.5 rounded-xl border border-gray-200 focus:border-[#121619] outline-none text-sm font-medium"
                   />
                   {searchingFrom && (
@@ -969,7 +1028,10 @@ export default function ScheduleTrip() {
                     required
                     placeholder="e.g. Mumbai, Jaipur, Manali, Goa"
                     value={params.locations}
-                    onChange={e => setParams({...params, locations: e.target.value})}
+                    onChange={e => {
+                      setUserDidTypeDest(true);
+                      setParams({...params, locations: e.target.value});
+                    }}
                     className="w-full pl-12 pr-10 py-3.5 rounded-xl border border-gray-200 focus:border-[#121619] focus:ring-1 focus:ring-[#121619] outline-none transition-all text-sm font-medium"
                   />
                   {searchingDest && (
@@ -1013,6 +1075,7 @@ export default function ScheduleTrip() {
                       const newParams = { ...params, fromDate: newFromDate };
                       if (params.toDate && new Date(newFromDate) > new Date(params.toDate)) {
                         newParams.toDate = newFromDate;
+                        addToast({ type: 'info', message: 'Return date updated to match departure date.', title: 'Dates Adjusted' });
                       }
                       setParams(newParams);
                     }}
@@ -1030,7 +1093,14 @@ export default function ScheduleTrip() {
                     required
                     min={params.fromDate || new Date().toISOString().split('T')[0]}
                     value={params.toDate}
-                    onChange={e => setParams({...params, toDate: e.target.value})}
+                    onChange={e => {
+                      const newToDate = e.target.value;
+                      if (params.fromDate && new Date(newToDate) < new Date(params.fromDate)) {
+                        addToast({ type: 'error', message: 'Return date cannot be earlier than departure date.', title: 'Invalid Date' });
+                        return;
+                      }
+                      setParams({...params, toDate: newToDate});
+                    }}
                     className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:border-[#121619] outline-none text-sm font-medium"
                   />
                 </div>
@@ -1365,6 +1435,7 @@ export default function ScheduleTrip() {
                       travellers={params.travellers}
                       onNext={() => setWizardStep(3)}
                       onBack={() => setWizardStep(1)}
+                      isForeignTrip={isForeignTrip}
                     />
                   )}
                   {wizardStep === 3 && (
@@ -1373,6 +1444,8 @@ export default function ScheduleTrip() {
                       scheduleData={wizardData.scheduleData}
                       onUpdateSchedule={updateSchedule}
                       totalDays={calculateTotalDays()}
+                      fromDate={params.fromDate}
+                      tripCheckResult={tripCheckResult}
                       outboundTransport={wizardData.outboundTransport}
                       returnTransport={wizardData.returnTransport}
                       onNext={() => setWizardStep(4)}
@@ -1425,6 +1498,7 @@ export default function ScheduleTrip() {
                       validationError={validationError}
                       fromCity={params.fromCity}
                       toCity={params.locations}
+                      tripCheckResult={tripCheckResult}
                       onEditDates={() => { setValidationError(null); setPageState('input'); }}
                     />
                   )}

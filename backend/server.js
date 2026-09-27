@@ -218,7 +218,10 @@ app.get('/v1/planner/places/search', async (req, res) => {
   try {
     const response = await axios.post(
       `${GOOGLE_PLACES_BASE}/places:autocomplete`,
-      { input: query.trim(), includedRegionCodes: ['in'] },
+      {
+        input: query.trim(),
+        includedPrimaryTypes: ['locality', 'administrative_area_level_1', 'country'],
+      },
       { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/' }, timeout: 8000 }
     );
     res.json(response.data);
@@ -228,15 +231,82 @@ app.get('/v1/planner/places/search', async (req, res) => {
   }
 });
 
+// GET /v1/planner/places/attractions?city=<name>
+app.get('/v1/planner/places/attractions', async (req, res) => {
+  console.log("HIT ATTRACTIONS ROUTE with city:", req.query.city);
+  const key = getGoogleKey();
+  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Google Places key not configured.' });
+  const city = req.query.city || '';
+  if (!city.trim()) return res.status(400).json({ error: 'city query param required' });
+  try {
+    const response = await axios.post(
+      `${GOOGLE_PLACES_BASE}/places:searchText`,
+      { textQuery: `top tourist attractions in ${city.trim()}`, maxResultCount: 10 },
+      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos' }, timeout: 10000 }
+    );
+    res.json(response.data);
+  } catch (err) {
+    console.error('[v1/planner/places/attractions]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
+// GET /v1/planner/places/restaurants?city=<name>
+app.get('/v1/planner/places/restaurants', async (req, res) => {
+  console.log("HIT RESTAURANTS ROUTE with city:", req.query.city);
+  const key = getGoogleKey();
+  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Google Places key not configured.' });
+  const city = req.query.city || '';
+  if (!city.trim()) return res.status(400).json({ error: 'city query param required' });
+  try {
+    // Step 1: Geocode city to get coordinates for locationBias
+    let locationBias = undefined;
+    try {
+      const geoRes = await axios.get(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city.trim())}&format=json&limit=1`,
+        { headers: { 'User-Agent': 'FirstflightTravels/1.0' }, timeout: 5000 }
+      );
+      const geo = geoRes.data?.[0];
+      if (geo?.lat && geo?.lon) {
+        locationBias = {
+          circle: {
+            center: { latitude: parseFloat(geo.lat), longitude: parseFloat(geo.lon) },
+            radius: 15000.0  // 15km radius strictly within city
+          }
+        };
+      }
+    } catch (geoErr) {
+      console.warn('[restaurants] Geocode for location bias failed, falling back to text-only:', geoErr.message);
+    }
+
+    const requestBody = {
+      textQuery: `top restaurants in ${city.trim()}`,
+      maxResultCount: 15,
+      ...(locationBias && { locationBias }),
+    };
+
+    const response = await axios.post(
+      `${GOOGLE_PLACES_BASE}/places:searchText`,
+      requestBody,
+      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos,places.primaryType' }, timeout: 10000 }
+    );
+    res.json(response.data);
+  } catch (err) {
+    console.error('[v1/planner/places/restaurants]', err.message);
+    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
+  }
+});
+
 // GET /v1/planner/places/:placeId
 app.get('/v1/planner/places/:placeId', async (req, res) => {
+  console.log("HIT PLACEID ROUTE with placeId:", req.params.placeId);
   const key = getGoogleKey();
   if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Google Places key not configured.' });
   const { placeId } = req.params;
   try {
     const response = await axios.get(
       `${GOOGLE_PLACES_BASE}/places/${encodeURIComponent(placeId)}`,
-      { headers: { 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'id,displayName,location,rating,formattedAddress,websiteUri,photos' }, timeout: 8000 }
+      { headers: { 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'id,displayName,location,rating,formattedAddress,websiteUri,photos,regularOpeningHours' }, timeout: 8000 }
     );
     res.json(response.data);
   } catch (err) {
@@ -264,24 +334,7 @@ app.get('/v1/planner/geocode', async (req, res) => {
   }
 });
 
-// GET /v1/planner/places/attractions?city=<name>
-app.get('/v1/planner/places/attractions', async (req, res) => {
-  const key = getGoogleKey();
-  if (!key) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Google Places key not configured.' });
-  const city = req.query.city || '';
-  if (!city.trim()) return res.status(400).json({ error: 'city query param required' });
-  try {
-    const response = await axios.post(
-      `${GOOGLE_PLACES_BASE}/places:searchText`,
-      { textQuery: `top tourist attractions in ${city.trim()}`, maxResultCount: 10 },
-      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos' }, timeout: 10000 }
-    );
-    res.json(response.data);
-  } catch (err) {
-    console.error('[v1/planner/places/attractions]', err.message);
-    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
-  }
-});
+
 
 // POST /v1/planner/route  — OpenRouteService proxy
 app.post('/v1/planner/route', async (req, res) => {

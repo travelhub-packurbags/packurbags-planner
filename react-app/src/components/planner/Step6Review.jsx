@@ -38,7 +38,8 @@ export default function Step6Review({
   onEditDates,
   onCaptureSnippet,
   fromCity = '',
-  toCity = ''
+  toCity = '',
+  tripCheckResult = null
 }) {
   const totalCost = calculateTotalCost();
   const selectedPlaces = wizardData.selectedPlaces || [];
@@ -147,9 +148,30 @@ export default function Step6Review({
   const restTotal = selectedRestaurants.reduce((sum, r) => sum + (r.price || 400) * Math.ceil((r.seats || 2) / 2), 0);
   const diningTotal = cafesTotal + restTotal;
 
+  const isTripTooShort = tripCheckResult && tripCheckResult.travelDays !== undefined && (tripCheckResult.totalDays - (tripCheckResult.travelDays * 2)) <= 1 && selectedPlaces.length > 2;
+
   return (
     <div className="w-full p-4 sm:p-6">
       
+      {isTripTooShort && (
+        <div className="mb-6 bg-red-50 text-red-900 p-4 rounded-2xl border border-red-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <span className="text-xs font-extrabold text-red-700 uppercase tracking-wider block mb-1">
+              ⚠️ Warning: Cluttered Itinerary
+            </span>
+            <p className="text-sm font-medium">
+              You only have 1 effective day for sightseeing after travel, but you have selected <strong>{selectedPlaces.length}</strong> tourist spots. The AI may struggle to fit all these spots.
+            </p>
+          </div>
+          <button
+            onClick={() => onJumpToStep(1)}
+            className="shrink-0 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all whitespace-nowrap"
+          >
+            Limit Places
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="text-center mb-8">
         <span className="text-xs font-bold text-[#f97316] uppercase tracking-widest bg-orange-50 px-3.5 py-1 rounded-full border border-orange-200/80">

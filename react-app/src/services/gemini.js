@@ -600,6 +600,7 @@ export async function generateTripPlan(config) {
     toDate, 
     mode, 
     budget, 
+    budgetNumeric, 
     tripType = 'Family Trip',
     fromCity = 'Delhi', 
     travellerCount = 2, 
@@ -616,6 +617,7 @@ export async function generateTripPlan(config) {
     routeInfo = null,
     liveTransport = null,  // DSA live transport from auto-transport endpoint
     liveHotels = null,     // DSA live hotels
+    isForeignTrip = false,
   } = config;
 
   // ── Helper: normalize any date string to YYYY-MM-DD ──
@@ -745,7 +747,7 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
       };
     }
     const arrivalDay = travelDays + 1;
-    userMessage += `\n\n- ROAD_TRIP_ENFORCEMENT:\nMAXIMUM DRIVE PER DAY: 10 hours. NEVER exceed this in any single day.\nEstimated driving time: ${routeInfo.durationDisplay} (${drivingHours.toFixed(1)} hours).\nDrive days one-way: ${travelDays} (ceil of hours / 8).\nTotal trip days: ${totalTripDaysV}.\nSCHEDULE RULE: Day 1 to Day ${travelDays} = DRIVE DAYS (en-route, NOT at destination).\nDay ${arrivalDay} onwards = sightseeing at destination.\nLast ${travelDays} days = return drive back to ${fromCity}.\nARRIVAL DAY: If arriving after 14:00, only light evening walk + dinner. NO major monuments on arrival day.\nEach drive day: 06:00 depart -> 08:30 breakfast dhaba -> 13:00 lunch dhaba -> 18:30 check-in -> 20:30 dinner.\nFor micro-timings between random highway dhabas on drive days, calculate exactly based on distance / 60 km/hr. Do not hallucinate random travel times.\nONE hotel per city, do NOT change hotels daily at destination. If suggesting an overnight hotel en-route for the drive, label it clearly as "Suggested overnight stop — not booked".\n\nRESTAURANT SHIFT RULE (CRITICAL): The traveller arrives at the destination on Day ${arrivalDay}. If ANY user-selected restaurant or cafe has been assigned to Day 1 through Day ${travelDays} (the drive days), automatically reschedule it to Day ${arrivalDay} or later — never place a Mumbai/destination restaurant on a highway drive day. Do NOT place destination city restaurants on drive days under any circumstances.\n\nHOTEL CHECK-IN TO RESTAURANT GAP RULE: Hotel check-in happens at 14:00 (standard). Any restaurant booking must be scheduled AT LEAST 4 hours after check-in — i.e., no earlier than 18:00 on arrival/check-in days. Never schedule dinner at 14:30 or 15:00 on a check-in day.`;
+    userMessage += `\n\n- ROAD_TRIP_ENFORCEMENT:\nMAXIMUM DRIVE PER DAY: 10 hours. NEVER exceed this in any single day.\nEstimated driving time: ${routeInfo.durationDisplay} (${drivingHours.toFixed(1)} hours).\nDrive days one-way: ${travelDays} (ceil of hours / 8).\nTotal trip days: ${totalTripDaysV}.\nSCHEDULE RULE: Day 1 to Day ${travelDays} = DRIVE DAYS (en-route, NOT at destination).\nDay ${arrivalDay} onwards = sightseeing at destination.\nLast ${travelDays} days = return drive back to ${fromCity}.\nARRIVAL DAY: If arriving after 14:00, only light evening walk + dinner. NO major monuments on arrival day.\nEach drive day: 06:00 depart -> 08:30 breakfast dhaba -> 13:00 lunch dhaba -> 18:30 check-in -> 20:30 dinner.\nFor micro-timings between random highway dhabas on drive days, calculate exactly based on distance / 60 km/hr. Do not hallucinate random travel times.\nONE hotel per city, do NOT change hotels daily at destination. If suggesting an overnight hotel en-route for the drive, label it clearly as "Suggested overnight stop — not booked".\n\nRESTAURANT SHIFT RULE (CRITICAL): The traveller arrives at the destination on Day ${arrivalDay}. If ANY user-selected restaurant or cafe has been assigned to Day 1 through Day ${travelDays} (the drive days), automatically reschedule it to Day ${arrivalDay} or later — never place a Mumbai/destination restaurant on a highway drive day. Do NOT place destination city restaurants on drive days under any circumstances.\n\nHOTEL CHECK-IN TO RESTAURANT GAP RULE: Hotel check-in happens at 14:00 (standard). Any restaurant booking must be scheduled AT LEAST 4 hours after check-in — i.e., no earlier than 18:00 on arrival/check-in days. Never schedule dinner at 14:30 or 15:00 on a check-in day.\n\nDEPARTURE DAY ENFORCEMENT: The user's return journey begins on the LAST ${travelDays} day(s) of the trip (Day ${computedTotalDays - travelDays + 1} onwards). From the moment the return journey starts: (a) Do NOT schedule any tourist spots or sightseeing at the destination. (b) Do NOT schedule hotel check-ins at the destination. (c) Mark all morning/afternoon slots as "DEPARTURE DRIVE" or "TRANSIT HOME". (d) Only en-route highway stops for fuel/food/rest are permitted. (e) The return journey ends at ${fromCity}.`;
   }
 
 
@@ -764,7 +766,7 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
     }).join('\n');
 
     userMessage += `\n\n- CUSTOMER_SELECTED_TOURIST_HUBS_AND_SCHEDULE (marked [USER_SELECTED]):\n${placesDetails}`;
-    userMessage += `\n\nCRITICAL INSTRUCTION: You MUST place each [USER_SELECTED] attraction into the itinerary on its assigned Day and Time Slot. Mark these items with "source": "user" in the schedule JSON. All other sightseeing items added by you must have "source": "ai". In the tips and precautions section, explicitly highlight the DSLR policies and Weekly Off days for these selected places.`;
+    userMessage += `\n\nCRITICAL INSTRUCTION: You MUST place each [USER_SELECTED] attraction into the itinerary on its assigned Day and Time Slot (unless that time slot violates the ARRIVAL_CONSTRAINTS). NEVER schedule a tourist spot on its "Weekly Off" day! Check the actual day of the week for each date. Mark these items with "source": "user" in the schedule JSON. All other sightseeing items added by you must have "source": "ai".`;
   } else if ((customPlaces || []).length > 0) {
     // Places were selected but for wrong city — warn AI
     userMessage += `\n\n- NOTE: User had pre-selected places from a different city. Do NOT include them. Generate appropriate ${destCity} sightseeing instead.`;
@@ -801,6 +803,17 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
       const retMode = returnTransport.type || returnTransport.mode || 'Vehicle';
       userMessage += `\n* Return (Last Day): ${retMode} via ${returnTransport.operator} (${returnTransport.depTime} - ${returnTransport.arrTime}, ₹${returnTransport.price || 0}/person)`;
     }
+
+    if (outboundTransport && outboundTransport.arrTime) {
+      const arrTimeStr = outboundTransport.arrTime.toLowerCase();
+      userMessage += `\n\n- ARRIVAL_CONSTRAINTS (DAY 1): The user arrives at their destination at ${arrTimeStr}.`;
+      if (arrTimeStr.includes('pm') || arrTimeStr.includes('noon') || arrTimeStr.includes('evening') || arrTimeStr.includes('night') || (parseInt(arrTimeStr) >= 12 && !arrTimeStr.includes('am'))) {
+        userMessage += `\n  - RULE: Since the user arrives at noon/afternoon/evening/night, DO NOT schedule ANY tourist spots or heavy activities on Day 1. Only schedule check-in, dinner, and relaxing activities.`;
+      } else {
+        userMessage += `\n  - RULE: Since the user arrives in the morning, you may schedule AT MOST 2 tourist spots on Day 1.`;
+      }
+      userMessage += `\n  - RULE: If the user has pre-selected more tourist spots than can fit on Day 1, move the rest to subsequent days.`;
+    }
   }
 
   // Live DSA Transport Data (from auto-generated itinerary — real API data)
@@ -835,12 +848,28 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
     userMessage += `\n  - Provide a balanced mix of sightseeing, leisure, and local culture.`;
   }
 
+  // SCHEDULE ENFORCEMENT: Inject user's hard-scheduled tourist spots
+  if (scheduleData && Object.keys(scheduleData).length > 0) {
+    const scheduledEntries = [];
+    Object.entries(scheduleData).forEach(([placeId, assignment]) => {
+      const spot = customPlaces.find(p => p.id === placeId);
+      const name = spot?.name || assignment.name || placeId;
+      const day = assignment.day || 'Day 1';
+      const slot = assignment.timeSlot || 'Morning';
+      scheduledEntries.push(`* "${name}" → ${day}, ${slot} [HARD_SCHEDULED_BY_USER]`);
+    });
+    if (scheduledEntries.length > 0) {
+      userMessage += `\n\n- USER_HARD_SCHEDULED_SPOTS (IMMUTABLE):\n${scheduledEntries.join('\n')}`;
+      userMessage += `\n\nCRITICAL SCHEDULING RULES (NO EXCEPTIONS):\n1. You MUST place each [HARD_SCHEDULED_BY_USER] spot in the EXACT Day and Time Slot specified. Do NOT move them.\n2. You MUST NOT duplicate any [HARD_SCHEDULED_BY_USER] spot on any other day.\n3. Only fill the REMAINING empty Day + TimeSlot combinations with AI-curated suggestions.\n4. If the user scheduled a spot at a specific time, do NOT place any other sightseeing at that same Day + TimeSlot.`;
+    }
+  }
+
   // Scheduled Dining (Cafes & Restaurants) — use safe fallbacks for missing day/timeSlot
   if (selectedCafes.length > 0 || selectedRestaurants.length > 0) {
     const cafesText = selectedCafes.map(c => `* Cafe: ${c.name} (Assigned: ${c.day || 'Any Day'} ${c.timeSlot || 'Lunch'}, Rate for two: ₹${c.rate_for_two || c.price || 500}) [USER_SELECTED]`).join('\n');
     const restText  = selectedRestaurants.map(r => `* Restaurant: ${r.name} (Assigned: ${r.day || 'Any Day'} ${r.timeSlot || 'Dinner'}, Price for two: ₹${r.price || r.rate_for_two || 500}) [USER_SELECTED]`).join('\n');
     userMessage += `\n\n- CUSTOMER_SELECTED_DINING (marked [USER_SELECTED]):\n${cafesText}\n${restText}`;
-    userMessage += `\n\nCRITICAL INSTRUCTION: Place these [USER_SELECTED] restaurants and cafes into the itinerary. Mark them with "source": "user" in the schedule JSON. If no specific day is given, distribute them across destination days at appropriate meal times.`;
+    userMessage += `\n\nCRITICAL INSTRUCTION: Place these [USER_SELECTED] restaurants and cafes into the itinerary. Mark them with "source": "user" in the schedule JSON. If no specific day is given, distribute them across destination days at appropriate meal times. For ALL OTHER meal slots NOT covered by [USER_SELECTED] items: You MUST use real, named restaurants from the destination city. Do NOT repeat the same restaurant name twice. Do NOT use placeholder names like "Local Heritage Restaurant", "Highway Dhaba", or any generic fictional names. Pick varied, real restaurant names appropriate for the destination city and meal type.`;
   }
 
   // Budget Guardrails
@@ -856,6 +885,12 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
     3. The final \`total_cost_inr\` MUST reflect reality, even if it exceeds the user's requested budget. Do NOT fake numbers to make it fit.`;
   } else {
     userMessage += `\nEnsure the final budget reflects the chosen tier (${budget}) and doesn't artificially inflate or deflate real-world costs.`;
+  }
+
+  // Foreign trip — inject visa + currency guidance
+  if (isForeignTrip) {
+    const destCountry = (locations[0] || 'abroad').trim();
+    userMessage += `\n\nFOREIGN TRIP INSTRUCTIONS:\n1. Add a "visa_requirements" key to trip_summary with: visa type required for Indian passport holders, estimated visa fee in USD/INR, processing time, and whether visa-on-arrival is available.\n2. Add a "currency_info" key with: local currency name, current approximate exchange rate from INR, whether cards are widely accepted, and cash withdrawal tips.\n3. In the "tips" array, include at minimum: (a) international travel insurance recommendation, (b) SIM card / data roaming advice, (c) emergency contact numbers for the destination country, (d) recommended travel documents checklist (passport validity, tickets, hotel booking printouts).\n4. Use your knowledge of ${destCountry} to provide accurate, destination-specific advice. Do NOT use generic placeholder text.`;
   }
 
   userMessage += `\n\nFINAL REMINDER — "source" field in every schedule item:

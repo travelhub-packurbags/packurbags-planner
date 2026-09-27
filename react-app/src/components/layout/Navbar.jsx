@@ -47,6 +47,7 @@ export default function Navbar() {
               <Link
                 key={link.to}
                 to={link.to}
+                state={{ reset: true }}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
                   location.pathname === link.to
                     ? 'bg-white text-[#121619] shadow-md'
@@ -94,6 +95,7 @@ export default function Navbar() {
                   <Link
                     key={link.to}
                     to={link.to}
+                    state={{ reset: true }}
                     onClick={() => setMobileOpen(false)}
                     className={`block px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       location.pathname === link.to

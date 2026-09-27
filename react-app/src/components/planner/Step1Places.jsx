@@ -131,14 +131,14 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         const data = await res.json();
 
         const targetCity = (destination || '').toLowerCase().trim();
-        let filtered = data.filter(p => p.city.toLowerCase().includes(targetCity) || targetCity.includes(p.city.toLowerCase()));
+        let filtered = data.filter(p => p.city.toLowerCase() === targetCity || p.city.toLowerCase().includes(targetCity));
 
         if (filtered.length < 3) {
           const fallback = data.filter(p =>
+            p.state.toLowerCase() === targetCity ||
+            p.zone.toLowerCase() === targetCity ||
             p.state.toLowerCase().includes(targetCity) ||
-            p.zone.toLowerCase().includes(targetCity) ||
-            targetCity.includes(p.state.toLowerCase()) ||
-            targetCity.includes(p.zone.toLowerCase())
+            p.zone.toLowerCase().includes(targetCity)
           );
           if (fallback.length > 0) {
             filtered = [...filtered, ...fallback];
@@ -209,12 +209,19 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         setPlaces(filtered);
 
         // Fetch live Weather data for each unique city represented in the hubs
+        const cityCoords = {};
+        filtered.forEach(p => {
+          if (p.city && p.lat && p.lng && !cityCoords[p.city]) {
+            cityCoords[p.city] = { lat: p.lat, lng: p.lng };
+          }
+        });
         const uniqueCities = Array.from(new Set(filtered.map(p => p.city).filter(Boolean)));
         const wMap = {};
         await Promise.all(
           uniqueCities.map(async (city) => {
             try {
-              const wData = await fetchWeather(city);
+              const coords = cityCoords[city];
+              const wData = coords ? await fetchWeather(city, coords.lat, coords.lng) : await fetchWeather(city);
               wMap[city] = wData;
             } catch (e) {
               console.warn(`Weather load failed for ${city}:`, e);
@@ -250,16 +257,18 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
         if (ctrl.cancelled) break;
         const isGenericFallback = (url) => !url || url.includes('1596178065887');
 
-        // Check if already in storage
-        const cached = getSelectedImage('place', place.id);
-        if (!isGenericFallback(cached)) {
-          place.image = cached;
-          setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: cached }));
+        // Prefer the live API image (e.g., from Google Places) if it exists
+        if (place.image && !isGenericFallback(place.image)) {
+          saveSelectedImage('place', place.id, place.image, { name: place.name, city: place.city });
+          setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: place.image }));
           continue;
         }
 
-        if (place.image && !isGenericFallback(place.image)) {
-          saveSelectedImage('place', place.id, place.image, { name: place.name, city: place.city });
+        // Check if already in storage
+        const cached = getSelectedImage('place', place.id);
+        if (cached && !isGenericFallback(cached)) {
+          place.image = cached;
+          setPlaceImages(prev => ({ ...prev, [`${place.name}::${place.city}`]: cached }));
           continue;
         }
 
@@ -360,7 +369,7 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
     setActiveModalPlace(place);
     if (place?.city && !cityWeatherMap[place.city]) {
       try {
-        const wData = await fetchWeather(place.city);
+        const wData = (place.lat && place.lng) ? await fetchWeather(place.city, place.lat, place.lng) : await fetchWeather(place.city);
         setCityWeatherMap(prev => ({ ...prev, [place.city]: wData }));
       } catch (e) {
         console.warn(`On-demand weather load failed for ${place.city}:`, e);
@@ -615,6 +624,12 @@ export default function Step1Places({ destination, selectedPlaces, onTogglePlace
                   </div>
 
                   {/* Description preview */}
+                  {(Number(place.entrance_fee_inr || place.entryFee || place.fee || 0) > 0) && (
+                    <div className="text-[11px] font-bold text-gray-600 mb-2 flex items-center gap-1.5">
+                      <span className="text-[#D4B15A]">🎟️ Entry Fee:</span> 
+                      <span>₹{Number(place.entrance_fee_inr || place.entryFee || place.fee || 0)} per person</span>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed mb-4">
                     {place.description || `Famous ${place.type} in ${place.city}.`}
                   </p>
