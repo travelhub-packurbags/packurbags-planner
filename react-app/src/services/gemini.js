@@ -890,13 +890,34 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
   // Foreign trip — inject visa + currency guidance
   if (isForeignTrip) {
     const destCountry = (locations[0] || 'abroad').trim();
-    userMessage += `\n\nFOREIGN TRIP INSTRUCTIONS:\n1. Add a "visa_requirements" key to trip_summary with: visa type required for Indian passport holders, estimated visa fee in USD/INR, processing time, and whether visa-on-arrival is available.\n2. Add a "currency_info" key with: local currency name, current approximate exchange rate from INR, whether cards are widely accepted, and cash withdrawal tips.\n3. In the "tips" array, include at minimum: (a) international travel insurance recommendation, (b) SIM card / data roaming advice, (c) emergency contact numbers for the destination country, (d) recommended travel documents checklist (passport validity, tickets, hotel booking printouts).\n4. Use your knowledge of ${destCountry} to provide accurate, destination-specific advice. Do NOT use generic placeholder text.`;
+    userMessage += `\n\nFOREIGN TRIP INSTRUCTIONS:\n1. Add a "visa_requirements" key to trip_summary with: visa type required for Indian passport holders, estimated visa fee in USD/INR, processing time, and whether visa-on-arrival is available.\n2. Add a "currency_info" key with: local currency name, current approximate exchange rate from INR, whether cards are widely accepted, and cash withdrawal tips.\n3. In the "tips" array, include at minimum: (a) international travel insurance recommendation, (b) SIM card / data roaming advice, (c) emergency contact numbers for the destination country, (d) recommended travel documents checklist.\n4. Use your knowledge of ${destCountry} to provide accurate, destination-specific advice.`;
+
+    // Calculate flight duration from transport data or fall back to route info
+    let flightHours = 0;
+    if (outboundTransport?.duration) {
+      // Parse duration string like "16h 30m" or "10h"
+      const match = outboundTransport.duration.match(/(\d+)h\s*(\d*)m?/);
+      if (match) flightHours = parseInt(match[1], 10) + (parseInt(match[2] || '0', 10) / 60);
+    } else if (routeInfo?.durationHours) {
+      flightHours = routeInfo.durationHours;
+    }
+
+    if (flightHours > 0) {
+      userMessage += `\n\nFLIGHT DURATION RULE FOR DAY 1:\nThe outbound flight takes approximately ${Math.round(flightHours)} hours.`;
+      if (flightHours >= 15) {
+        userMessage += `\n- This is a VERY LONG HAUL flight (${Math.round(flightHours)}h+). Day 1 of the destination stay must have ZERO tourist spots. Only hotel check-in, light dinner, and rest. The traveller will be exhausted from jet lag.`;
+      } else if (flightHours >= 10) {
+        userMessage += `\n- This is a LONG HAUL flight (${Math.round(flightHours)}h). Day 1 should have at most 1-2 LIGHT tourist spots (no strenuous activity). Prefer scenic walks, short viewpoints, or nearby cafes over full monument visits.`;
+      } else if (flightHours >= 6) {
+        userMessage += `\n- This is a MEDIUM HAUL flight (${Math.round(flightHours)}h). Day 1 may have 2-3 standard tourist spots, but avoid scheduling them before 2:00 PM arrival time.`;
+      } else {
+        userMessage += `\n- This is a SHORT HAUL flight (${Math.round(flightHours)}h). Day 1 can have a normal schedule of 2-3 tourist spots.`;
+      }
+      userMessage += `\n- NOTE: This flight duration rule applies to the DESTINATION ARRIVAL DAY only. Subsequent days should be packed as normal for the destination.`;
+    }
   }
 
-  userMessage += `\n\nFINAL REMINDER — "source" field in every schedule item:
-- "source": "user" → place/restaurant explicitly chosen by the user (from CUSTOMER_SELECTED lists above)
-- "source": "ai"   → everything else added by you to complete the itinerary
-This field MUST appear on every schedule item. Never omit it.`;
+  userMessage += `\n\nFINAL REMINDER — "source" and "label" fields in every schedule item:\n- "source": "user" and "label": "Customer's Choice" → place/restaurant explicitly chosen by the user (from CUSTOMER_SELECTED lists above)\n- "source": "ai" and "label": "PackUrBag Pick" → everything else added by you to complete the itinerary\nBoth fields MUST appear on every schedule item. Never omit them.`;
 
   let parsed = null;
   try {

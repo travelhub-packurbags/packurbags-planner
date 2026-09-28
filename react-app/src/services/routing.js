@@ -66,7 +66,12 @@ export async function getRoute(coordinatesArray) {
 
   } catch (err) {
     console.error('Route proxy failed, using haversine fallback:', err.message || err);
-    toast.warn('Routing offline. Time estimates are approximate', { toastId: 'ors-fallback-warn' });
+    // Suppress toast for obviously cross-ocean/international routes (lng gap > 30°)
+    const lngGap = Math.abs(formattedCoords[formattedCoords.length - 1][0] - formattedCoords[0][0]);
+    const isIntercontinental = lngGap > 30;
+    if (!isIntercontinental) {
+      toast.warn('Routing offline. Time estimates are approximate', { toastId: 'ors-fallback-warn' });
+    }
     return getHaversineFallbackRoute(formattedCoords);
   }
 }

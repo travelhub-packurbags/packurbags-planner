@@ -17,7 +17,6 @@ import {
   faLocationDot,
   faWandMagicSparkles
 } from '@fortawesome/free-solid-svg-icons';
-import { fetchSerperImage } from '../../services/serper';
 
 /**
  * Maps a cuisine/food-type string to a pre-tested, always-relevant Unsplash photo URL.
@@ -76,7 +75,7 @@ export default function Step5Dining({
   const [restaurantImages, setRestaurantImages] = useState({});
 
   const handleToggle = (rest) => {
-    const spotImg = restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image;
+    const spotImg = rest.image || restaurantImages[`${rest.name}::${rest.city || ''}`] || getCuisineImage(rest.food_type);
     if (onToggleRestaurant) {
       onToggleRestaurant({ ...rest, image: spotImg || rest.image });
     } else {
@@ -288,8 +287,8 @@ export default function Step5Dining({
                   <p className="text-xs text-gray-600 line-clamp-1 mb-3"><strong>Food Type:</strong> {rest.food_type}</p>
 
                   <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100 mb-4 flex justify-between items-center text-xs">
-                    <span className="text-gray-500 font-medium">Price for two:</span>
-                    <span className="font-extrabold text-gray-900">₹{rest.price.toLocaleString()}</span>
+                    <span className="text-gray-500 font-medium">Price per person:</span>
+                    <span className="font-extrabold text-gray-900">₹{rest.price?.toLocaleString('en-IN') || '—'}</span>
                   </div>
                 </div>
 

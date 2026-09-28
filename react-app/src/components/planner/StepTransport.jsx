@@ -148,6 +148,14 @@ export default function StepTransport({
   const [outboundMode, setOutboundMode] = useState(outboundTransport?.type || 'flight');
   const [returnMode, setReturnMode] = useState(returnTransport?.type || 'flight');
 
+  // Auto-switch to flight for foreign trips
+  useEffect(() => {
+    if (isForeignTrip) {
+      setOutboundMode('flight');
+      setReturnMode('flight');
+    }
+  }, [isForeignTrip]);
+
   const [driveMetrics, setDriveMetrics] = useState({ roadKm: 0, durationStr: 'Calculating...', depTime: '06:00 AM', arrTime: 'Calculating...' });
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
 
@@ -249,6 +257,7 @@ export default function StepTransport({
 
           setDriveMetrics({
             roadKm: routeData.distanceKm,
+            durationHours: totalHrs,  // store actual computed hours
             durationStr: `${routeData.durationDisplay}${days > 1 ? ` (~${days} Days Road Trip)` : ''}`,
             depTime: '06:00 AM',
             arrTime: arrTimeStr
@@ -297,7 +306,8 @@ export default function StepTransport({
     return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
   };
 
-  const totalDriveHours = driveMetrics.roadKm > 0 ? (driveMetrics.roadKm / 60) : 0;
+  const totalDriveHours = driveMetrics.durationHours > 0 ? driveMetrics.durationHours
+    : driveMetrics.roadKm > 0 ? (driveMetrics.roadKm / 60) : 0;
   const dynamicArrTime = !isLoadingMetrics && totalDriveHours > 0
     ? computeArrival(customDepTime, totalDriveHours)
     : driveMetrics.arrTime;

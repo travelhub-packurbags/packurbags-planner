@@ -29,6 +29,33 @@ const stopIcon = L.divIcon({
   iconSize: [22, 22], iconAnchor: [11, 11]
 });
 
+// Animated plane marker that moves along the great-circle path
+function AnimatedPlane({ stops, progress }) {
+  const map = useMap();
+  const markerRef = useRef(null);
+
+  const planeIcon = useMemo(() => L.divIcon({
+    className: '',
+    html: `<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5));transform:rotate(45deg);transition:all 0.08s linear;">✈️</div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 17],
+  }), []);
+
+  const position = useMemo(() => {
+    if (!stops || stops.length < 2) return null;
+    const from = stops[0];
+    const to = stops[stops.length - 1];
+    // Linear interpolation (great-circle approximation)
+    const lat = from.lat + (to.lat - from.lat) * progress;
+    const lng = from.lng + (to.lng - from.lng) * progress;
+    return [lat, lng];
+  }, [stops, progress]);
+
+  if (!position) return null;
+
+  return <Marker position={position} icon={planeIcon} zIndexOffset={1000} ref={markerRef} />;
+}
+
 // ── Map bounds fitter ──────────────────────────────────────────────────────────
 function MapFitter({ coords }) {
   const map = useMap();
@@ -51,6 +78,8 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
   const [dsaLive, setDsaLive] = useState(null); // null=loading, true=live, false=fallback
   const [hotelAuthError, setHotelAuthError] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isIntercontinental, setIsIntercontinental] = useState(false);
+  const [planePos, setPlanePos] = useState(0); // 0.0 to 1.0 for animation
   const [findingRest, setFindingRest] = useState(null); // hotelId being searched
   const [isCapturing, setIsCapturing] = useState(false);
   const initKey = useRef('');
@@ -73,6 +102,17 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
     loadAll(cities);
   }, [cities, fromDate, toDate]);
 
+  // Animate plane icon along the route for intercontinental trips
+  useEffect(() => {
+    if (!isIntercontinental) { setPlanePos(0); return; }
+    let pos = 0;
+    const interval = setInterval(() => {
+      pos = (pos + 0.002) % 1.0; // completes loop every ~500 frames (~8s at 60fps)
+      setPlanePos(pos);
+    }, 80); // update every 80ms for smooth animation
+    return () => clearInterval(interval);
+  }, [isIntercontinental]);
+
   const loadAll = async (currentCities) => {
     setLoading(true);
     setDsaLive(null);
@@ -87,6 +127,12 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
         if (c) geocoded.push({ name: city, lat: c.lat, lng: c.lng });
       }
       setStops(geocoded);
+
+      // Detect intercontinental (lng gap > 30 degrees)
+      if (geocoded.length >= 2) {
+        const lngGap = Math.abs(geocoded[geocoded.length - 1].lng - geocoded[0].lng);
+        setIsIntercontinental(lngGap > 30);
+      }
 
       // 2. Get driving route
       let route = null;
@@ -334,9 +380,19 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
             crossOrigin="anonymous"
           />
 
-          {/* Route polyline */}
+          {/* Route polyline or great-circle dashed path */}
           {routeInfo?.polylineCoords?.length > 0 && (
-            <Polyline positions={routeInfo.polylineCoords} color="#121619" weight={4} opacity={0.85} dashArray="8,8" />
+            <Polyline 
+              positions={routeInfo.polylineCoords} 
+              color={isIntercontinental ? '#6366f1' : '#121619'} 
+              weight={isIntercontinental ? 3 : 4} 
+              opacity={0.7} 
+              dashArray="10,10" 
+            />
+          )}
+          {/* Animated plane for intercontinental routes */}
+          {isIntercontinental && stops.length >= 2 && (
+            <AnimatedPlane stops={stops} progress={planePos} />
           )}
 
           {/* Stop markers */}

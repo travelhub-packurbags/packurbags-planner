@@ -546,19 +546,33 @@ export async function searchRestaurants(cityName) {
     const data = await res.json();
     if (data.code === 'PLANNER_UNAVAILABLE' || !data.places) return [];
 
-    return data.places.map((place, idx) => ({
-      id:          `google_rest_${place.id || idx}`,
-      name:        place.displayName?.text || 'Restaurant',
-      city:        cityName,
-      cuisine:     place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Multi-cuisine',
-      food_type:   place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Multi-cuisine',
-      rating:      place.rating || 4.2,
-      price:       500, // default estimation
-      lat:         place.location?.latitude,
-      lng:         place.location?.longitude,
-      image:       place.photos?.length ? `${BACKEND_URL}/api/planner/places/photo?ref=${encodeURIComponent(place.photos[0].name)}&maxH=400` : null,
-      address:     place.formattedAddress,
-    }));
+    return data.places.map((place, idx) => {
+      // Google Places priceLevel: PRICE_LEVEL_INEXPENSIVE=1, MODERATE=2, EXPENSIVE=3, VERY_EXPENSIVE=4
+      // Map to realistic INR price per person (converting to 2-person cost)
+      const priceLevelMap = {
+        'PRICE_LEVEL_FREE': 0,
+        'PRICE_LEVEL_INEXPENSIVE': 400,   // ~₹400/person, ₹800 for two
+        'PRICE_LEVEL_MODERATE': 1200,     // ~₹1200/person, ₹2400 for two
+        'PRICE_LEVEL_EXPENSIVE': 3000,    // ~₹3000/person, ₹6000 for two  
+        'PRICE_LEVEL_VERY_EXPENSIVE': 7000, // ~₹7000/person (fine dining)
+      };
+      const pricePerPerson = priceLevelMap[place.priceLevel] ?? 600;
+
+      return {
+        id:          `google_rest_${place.id || idx}`,
+        name:        place.displayName?.text || 'Restaurant',
+        city:        cityName,
+        cuisine:     place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Multi-cuisine',
+        food_type:   place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Multi-cuisine',
+        rating:      place.rating || 4.2,
+        price:       pricePerPerson,           // price per person in INR
+        price_level: place.priceLevel || null, // raw google level
+        lat:         place.location?.latitude,
+        lng:         place.location?.longitude,
+        image:       place.photos?.length ? `${BACKEND_URL}/api/planner/places/photo?ref=${encodeURIComponent(place.photos[0].name)}&maxH=400` : null,
+        address:     place.formattedAddress,
+      };
+    });
   } catch (err) {
     console.warn('[searchRestaurants] Error:', err.message);
     return [];
@@ -589,7 +603,16 @@ export function fetchGoogleAttractions(cityName) {
         zone:                 'Unknown',
         type:                 place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Tourist Hub',
         google_review_rating: place.rating || 4.5,
-        entrance_fee_inr:     0,
+        entrance_fee_inr:     (() => {
+          const lvl = place.priceLevel;
+          if (!lvl || lvl === 'PRICE_LEVEL_FREE') return 0;
+          if (lvl === 'PRICE_LEVEL_INEXPENSIVE') return 200;
+          if (lvl === 'PRICE_LEVEL_MODERATE') return 800;
+          if (lvl === 'PRICE_LEVEL_EXPENSIVE') return 2500;
+          if (lvl === 'PRICE_LEVEL_VERY_EXPENSIVE') return 5000;
+          return 0;
+        })(),
+        is_free_entry:        !place.priceLevel || place.priceLevel === 'PRICE_LEVEL_FREE',
         weekly_off:           'None',
         dslr_allowed:         'Yes',
         description:          place.editorialSummary?.text || `A popular tourist attraction in ${cityName}.`,

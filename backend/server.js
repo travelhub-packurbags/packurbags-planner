@@ -242,7 +242,7 @@ app.get('/v1/planner/places/attractions', async (req, res) => {
     const response = await axios.post(
       `${GOOGLE_PLACES_BASE}/places:searchText`,
       { textQuery: `top tourist attractions in ${city.trim()}`, maxResultCount: 10 },
-      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos' }, timeout: 10000 }
+      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos,places.primaryType,places.priceLevel,places.userRatingCount' }, timeout: 10000 }
     );
     res.json(response.data);
   } catch (err) {
@@ -288,7 +288,7 @@ app.get('/v1/planner/places/restaurants', async (req, res) => {
     const response = await axios.post(
       `${GOOGLE_PLACES_BASE}/places:searchText`,
       requestBody,
-      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos,places.primaryType' }, timeout: 10000 }
+      { headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'Referer': 'https://packurbag.in/', 'X-Goog-FieldMask': 'places.id,places.displayName,places.location,places.rating,places.formattedAddress,places.photos,places.primaryType,places.priceLevel' }, timeout: 10000 }
     );
     res.json(response.data);
   } catch (err) {
