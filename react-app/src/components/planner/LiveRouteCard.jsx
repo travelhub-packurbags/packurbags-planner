@@ -34,12 +34,21 @@ function AnimatedPlane({ stops, progress }) {
   const map = useMap();
   const markerRef = useRef(null);
 
+  const heading = useMemo(() => {
+    if (!stops || stops.length < 2) return 45;
+    const dy = stops[stops.length - 1].lat - stops[0].lat;
+    const dx = stops[stops.length - 1].lng - stops[0].lng;
+    // Calculate geographic bearing (North=0, East=90)
+    let bearing = Math.atan2(dx, dy) * (180 / Math.PI);
+    return bearing - 45; // Offset emoji's natural top-right angle
+  }, [stops]);
+
   const planeIcon = useMemo(() => L.divIcon({
     className: '',
-    html: `<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5));transform:rotate(45deg);transition:all 0.08s linear;">✈️</div>`,
+    html: `<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5));transform:rotate(${heading}deg);transition:all 0.05s linear;">✈️</div>`,
     iconSize: [34, 34],
     iconAnchor: [17, 17],
-  }), []);
+  }), [heading]);
 
   const position = useMemo(() => {
     if (!stops || stops.length < 2) return null;
@@ -107,9 +116,9 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
     if (!isIntercontinental) { setPlanePos(0); return; }
     let pos = 0;
     const interval = setInterval(() => {
-      pos = (pos + 0.002) % 1.0; // completes loop every ~500 frames (~8s at 60fps)
+      pos = (pos + 0.005) % 1.0; // 2.5x faster increment
       setPlanePos(pos);
-    }, 80); // update every 80ms for smooth animation
+    }, 50); // 50ms interval for smoother, faster animation
     return () => clearInterval(interval);
   }, [isIntercontinental]);
 
