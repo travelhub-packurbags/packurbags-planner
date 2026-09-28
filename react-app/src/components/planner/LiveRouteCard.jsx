@@ -507,14 +507,14 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
 
           {/* Destination hotels (blue) */}
           {destHotels.map((h, i) => (
-            <Marker key={`dest-${h.id || i}`} position={[h.lat, h.lng]} icon={hotelIcon}>
+            <Marker key={`dest-${h.id || 'h'}-${i}`} position={[h.lat, h.lng]} icon={hotelIcon}>
               <Popup><HotelPopup h={h} isRoutePoint={false} /></Popup>
             </Marker>
           ))}
 
-          {/* Route midway hotels (gold) — always pinned to polyline points */}
+          {/* Route midway hotels (gold) - always pinned to polyline points */}
           {routeHotels.map((h, i) => (
-            <Marker key={`route-${h.id || i}`} position={[h.lat, h.lng]} icon={routeHotelIcon}>
+            <Marker key={`route-${h.id || 'r'}-${i}`} position={[h.lat, h.lng]} icon={routeHotelIcon}>
               <Popup><HotelPopup h={h} isRoutePoint={true} /></Popup>
             </Marker>
           ))}

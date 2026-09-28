@@ -21,6 +21,11 @@ export async function getRoute(coordinatesArray) {
     return [78.9629, 20.5937];
   });
 
+  const lngGap = Math.abs(formattedCoords[formattedCoords.length - 1][0] - formattedCoords[0][0]);
+  if (lngGap > 30) {
+    return getHaversineFallbackRoute(formattedCoords);
+  }
+
   try {
     const res = await fetch(`${BACKEND_URL}/v1/planner/route`, {
       method: 'POST',

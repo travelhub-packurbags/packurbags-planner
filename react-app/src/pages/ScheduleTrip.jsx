@@ -275,10 +275,12 @@ export default function ScheduleTrip() {
     const isInIndia = (lat, lng) => lat >= 6 && lat <= 38 && lng >= 68 && lng <= 98;
     try {
       const [fc, tc] = await Promise.all([geocodeBestEffort(fromCity), geocodeBestEffort(toCity)]);
-      if (fc && tc) {
-        const fromIsIndia = isInIndia(fc.lat, fc.lng);
-        const toIsIndia   = isInIndia(tc.lat, tc.lng);
-        if (!toIsIndia || (!fromIsIndia && toIsIndia)) {
+      if (fc || tc) {
+        let isForeign = false;
+        if (fc && !isInIndia(fc.lat, fc.lng)) isForeign = true;
+        if (tc && !isInIndia(tc.lat, tc.lng)) isForeign = true;
+        
+        if (isForeign) {
           setIsForeignTrip(true);
           // For foreign trips, only flight is valid — skip road checks
           return { ok: true, travelDays: 0, routeInfo: null, modeType, isForeignTrip: true };

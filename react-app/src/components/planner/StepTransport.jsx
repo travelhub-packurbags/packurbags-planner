@@ -170,8 +170,10 @@ export default function StepTransport({
 
   const [loadingOut, setLoadingOut]   = useState(false);
   const [loadingRet, setLoadingRet]   = useState(false);
-  const [liveOut, setLiveOut]         = useState(false); // true = DSA live
-  const [liveRet, setLiveRet]         = useState(false);
+  const [liveFlightOut, setLiveFlightOut] = useState(false);
+  const [liveBusOut, setLiveBusOut]       = useState(false);
+  const [liveFlightRet, setLiveFlightRet] = useState(false);
+  const [liveBusRet, setLiveBusRet]       = useState(false);
   const [retryCount, setRetryCount]   = useState(0);
 
   const fetchDSA = useCallback(async () => {
@@ -181,10 +183,12 @@ export default function StepTransport({
 
     setLoadingOut(true);
     setLoadingRet(true);
-    setLiveOut(false);
-    setLiveRet(false);
+    setLiveFlightOut(false);
+    setLiveBusOut(false);
+    setLiveFlightRet(false);
+    setLiveBusRet(false);
 
-    // Fetch BOTH directions in parallel — independent settle
+    // Fetch BOTH directions in parallel - independent settle
     const [fOut, fRet, bOut, bRet] = await Promise.allSettled([
       fetch(`${BACKEND_URL}/api/planner/dsa/flights/search`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -204,29 +208,29 @@ export default function StepTransport({
       }).then(r => r.json()),
     ]);
 
-    // Outbound — use results from backend, badge as live only if source==='DSA'
+    // Outbound
     const outFlightData    = fOut.status === 'fulfilled' ? fOut.value : null;
     const outBusData       = bOut.status === 'fulfilled' ? bOut.value : null;
-    const isLiveO          = (outFlightData?.source === 'DSA' && outFlightData?.results?.length > 0) || (outBusData?.source === 'DSA' && outBusData?.results?.length > 0);
     const outFlightResults = outFlightData?.results?.length ? outFlightData.results : [];
     const outBusResults    = outBusData?.results?.length ? outBusData.results : [];
     setDsaFlightsOut(outFlightResults);
     setDsaBusesOut(outBusResults);
-    setLiveOut(isLiveO);
+    setLiveFlightOut(outFlightData?.source === 'DSA');
+    setLiveBusOut(outBusData?.source === 'DSA');
     setLoadingOut(false);
 
-    // Return — same logic
+    // Return
     const retFlightData    = fRet.status === 'fulfilled' ? fRet.value : null;
     const retBusData       = bRet.status === 'fulfilled' ? bRet.value : null;
-    const isLiveR          = (retFlightData?.source === 'DSA' && retFlightData?.results?.length > 0) || (retBusData?.source === 'DSA' && retBusData?.results?.length > 0);
     const retFlightResults = retFlightData?.results?.length ? retFlightData.results : [];
     const retBusResults    = retBusData?.results?.length ? retBusData.results : [];
     setDsaFlightsRet(retFlightResults);
     setDsaBusesRet(retBusResults);
-    setLiveRet(isLiveR);
+    setLiveFlightRet(retFlightData?.source === 'DSA');
+    setLiveBusRet(retBusData?.source === 'DSA');
     setLoadingRet(false);
 
-    console.log('[StepTransport] DSA fetch complete — Out:', outFlightResults.length, 'flights,', outBusResults.length, 'buses | Ret:', retFlightResults.length, 'flights,', retBusResults.length, 'buses');
+    console.log('[StepTransport] DSA fetch complete');
   }, [fromCity, destination, fromDate, toDate, travellers, retryCount]);
 
   useEffect(() => { fetchDSA(); }, [fetchDSA]);
@@ -276,7 +280,7 @@ export default function StepTransport({
     const depH = parseInt(hStr, 10);
     const depM = parseInt(mStr, 10);
     const totalMinutes = depH * 60 + depM + Math.round(totalDrivingHours * 60);
-    const days = Math.floor(totalMinutes / (8 * 60)); // days driven (8h/day max)
+    const days = Math.floor(totalDrivingHours / 8); // days driven (8h/day max)
     // Last day: minutes after 06:00 AM start
     const lastDayDepMinutes = 6 * 60; // 06:00 AM on day 2+
     let arrMinutes;
@@ -285,7 +289,7 @@ export default function StepTransport({
       arrMinutes = totalMinutes;
     } else {
       // Multi-day: last day departs 06:00, drives remaining hours
-      const remainingHours = totalDrivingHours - (days * 8);
+      const remainingHours = totalDrivingHours % 8;
       arrMinutes = lastDayDepMinutes + Math.round(remainingHours * 60);
     }
     const arrH = Math.floor(arrMinutes / 60) % 24;
@@ -331,12 +335,12 @@ export default function StepTransport({
     : (dsaBusesRet.length ? dsaBusesRet : MOCK_BUSES_RET);
 
   const outboundIsLive = outboundMode === 'bike' ? true
-    : outboundMode === 'flight' ? dsaFlightsOut.length > 0
-    : dsaBusesOut.length > 0;
+    : outboundMode === 'flight' ? liveFlightOut
+    : liveBusOut;
 
   const returnIsLive = returnMode === 'bike' ? true
-    : returnMode === 'flight' ? dsaFlightsRet.length > 0
-    : dsaBusesRet.length > 0;
+    : returnMode === 'flight' ? liveFlightRet
+    : liveBusRet;
 
   const ModeTab = ({ mode, current, onChange, icon, label, disabled = false }) => (
     <button

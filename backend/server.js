@@ -1367,8 +1367,53 @@ app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (re
     return res.json({ success: true, results: hotels, traceId, source: 'DSA' });
   }
 
-  // Fallback to local
-  console.log(`[hotel-search] All DSA cityIds returned auth errors for ${city}, falling back to local dataset`);
+  // Fallback to Google Places first, then local
+  console.log(`[hotel-search] DSA returned no results for ${city}, trying Google Places`);
+  try {
+    const key = getGoogleKey();
+    if (key) {
+      const gpRes = await axios.post(
+        'https://places.googleapis.com/v1/places:searchText',
+        { textQuery: `best hotels in ${city}` },
+        {
+          headers: {
+            'X-Goog-Api-Key': key,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.photos',
+            'Content-Type': 'application/json'
+          },
+          timeout: 5000
+        }
+      );
+      if (gpRes.data.places && gpRes.data.places.length > 0) {
+        const gpHotels = gpRes.data.places.map((p, i) => {
+          const images = p.photos ? p.photos.slice(0, 4).map(ph => `/v1/planner/places/photo?ref=${ph.name}&maxH=500`) : [
+            'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+            'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=800&q=80'
+          ];
+          return {
+            id: p.id,
+            property_name: p.displayName?.text || 'Hotel',
+            address: p.formattedAddress,
+            hotel_stars: p.rating ? Math.round(p.rating) : 4,
+            price_per_night_inr: 5000 + Math.floor(Math.random() * 5000), // Mock price since Places API doesn't return prices
+            price_inr: 5000,
+            city,
+            images,
+            image: images[0],
+            lat: p.location?.latitude,
+            lng: p.location?.longitude,
+            source: 'GooglePlaces'
+          };
+        });
+        console.log(`[hotel-search] Returning ${gpHotels.length} Google Places hotels for ${city}`);
+        return res.json({ success: true, results: gpHotels, source: 'GooglePlaces' });
+      }
+    }
+  } catch (err) {
+    console.warn(`[hotel-search] Google Places fallback failed: ${err.message}`);
+  }
+
+  console.log(`[hotel-search] falling back to local dataset for ${city}`);
   const local = getLocalHotelsForCity(city, true);
   return res.json({ success: true, results: local, source: 'LocalFallback' });
 });
@@ -1572,6 +1617,51 @@ app.post(['/api/planner/dsa/hotels/along-route', '/api/dsa/hotels/along-route'],
           routePoint: true,
         };
       });
+    }
+
+    // Fallback to Google Places first
+    console.log(`[along-route] DSA failed/unauthorized for ${cityName}, trying Google Places`);
+    try {
+      const key = getGoogleKey();
+      if (key) {
+        const gpRes = await axios.post(
+          'https://places.googleapis.com/v1/places:searchText',
+          { textQuery: `best hotels in ${cityName}` },
+          {
+            headers: {
+              'X-Goog-Api-Key': key,
+              'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.photos',
+              'Content-Type': 'application/json'
+            },
+            timeout: 5000
+          }
+        );
+        if (gpRes.data.places && gpRes.data.places.length > 0) {
+          const gpHotels = gpRes.data.places.map((p, i) => {
+            const images = p.photos ? p.photos.slice(0, 4).map(ph => `/v1/planner/places/photo?ref=${ph.name}&maxH=500`) : [
+              'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80'
+            ];
+            return {
+              id: p.id,
+              property_name: p.displayName?.text || 'Hotel',
+              name: p.displayName?.text || 'Hotel',
+              address: p.formattedAddress,
+              hotel_stars: p.rating ? Math.round(p.rating) : 4,
+              price_per_night_inr: 5000 + Math.floor(Math.random() * 5000), // Mock price
+              city: cityName,
+              images,
+              image: images[0],
+              lat: p.location?.latitude,
+              lng: p.location?.longitude,
+              source: 'GooglePlaces',
+              routePoint: true
+            };
+          });
+          return gpHotels.slice(0, 2);
+        }
+      }
+    } catch (err) {
+      console.warn(`[along-route] Google Places fallback failed: ${err.message}`);
     }
 
     // Fallback to local
