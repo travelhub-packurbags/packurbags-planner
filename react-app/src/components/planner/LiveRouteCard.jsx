@@ -29,36 +29,104 @@ const stopIcon = L.divIcon({
   iconSize: [22, 22], iconAnchor: [11, 11]
 });
 
-// Animated plane marker that moves along the great-circle path
+// Great circle arc calculation between two geographic coordinates
+function getGreatCircleArc(start, end, numPoints = 80) {
+  if (!start || !end) return [];
+  const points = [];
+  const d2r = Math.PI / 180;
+  const r2d = 180 / Math.PI;
+  const lat1 = start.lat * d2r;
+  const lon1 = start.lng * d2r;
+  const lat2 = end.lat * d2r;
+  const lon2 = end.lng * d2r;
+
+  const d = 2 * Math.asin(Math.sqrt(
+    Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)
+  ));
+
+  if (d === 0 || isNaN(d)) return [[start.lat, start.lng]];
+
+  for (let i = 0; i <= numPoints; i++) {
+    const f = i / numPoints;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+    const lat = Math.atan2(z, Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2))) * r2d;
+    const lon = Math.atan2(y, x) * r2d;
+    points.push([lat, lon]);
+  }
+  return points;
+}
+
+// Animated plane marker that moves smoothly along the curved flight path
 function AnimatedPlane({ stops, progress }) {
   const map = useMap();
   const markerRef = useRef(null);
 
-  const heading = useMemo(() => {
-    if (!stops || stops.length < 2) return 45;
-    const dy = stops[stops.length - 1].lat - stops[0].lat;
-    const dx = stops[stops.length - 1].lng - stops[0].lng;
-    // Calculate geographic bearing (North=0, East=90)
-    let bearing = Math.atan2(dx, dy) * (180 / Math.PI);
-    return bearing - 45; // Offset emoji's natural top-right angle
+  const arc = useMemo(() => {
+    if (!stops || stops.length < 2) return [];
+    return getGreatCircleArc(stops[0], stops[stops.length - 1], 100);
   }, [stops]);
+
+  const { position, heading } = useMemo(() => {
+    if (!arc || arc.length < 2) {
+      if (!stops || stops.length < 2) return { position: null, heading: 0 };
+      const from = stops[0];
+      const to = stops[stops.length - 1];
+      const dy = to.lat - from.lat;
+      const dx = to.lng - from.lng;
+      return {
+        position: [from.lat + dy * progress, from.lng + dx * progress],
+        heading: Math.atan2(dx, dy) * (180 / Math.PI)
+      };
+    }
+    const totalSegments = arc.length - 1;
+    const rawIdx = progress * totalSegments;
+    const idx = Math.min(Math.floor(rawIdx), totalSegments - 1);
+    const nextIdx = idx + 1;
+    const t = rawIdx - idx;
+    const curr = arc[idx];
+    const nxt = arc[nextIdx];
+    const lat = curr[0] + (nxt[0] - curr[0]) * t;
+    const lng = curr[1] + (nxt[1] - curr[1]) * t;
+    const dy = nxt[0] - curr[0];
+    const dx = nxt[1] - curr[1];
+    const bearing = Math.atan2(dx, dy) * (180 / Math.PI);
+    return { position: [lat, lng], heading: bearing };
+  }, [arc, stops, progress]);
 
   const planeIcon = useMemo(() => L.divIcon({
     className: '',
-    html: `<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5));transform:rotate(${heading}deg);transition:all 0.05s linear;">✈️</div>`,
-    iconSize: [34, 34],
-    iconAnchor: [17, 17],
+    html: `
+      <div style="position:relative; width:44px; height:44px; display:flex; align-items:center; justify-content:center;">
+        <!-- Soft radar aura -->
+        <div style="position:absolute; width:36px; height:36px; border-radius:50%; background:radial-gradient(circle, rgba(99,102,241,0.35) 0%, rgba(99,102,241,0) 75%); pointer-events:none;"></div>
+        <!-- Rotated aircraft with user transition -->
+        <div style="transform:rotate(${heading}deg); transition:all 0.02s linear; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">
+          <svg width="34" height="34" viewBox="0 0 100 100" style="filter:drop-shadow(0 4px 8px rgba(15,23,42,0.45)); overflow:visible;">
+            <!-- Contrail vapor trails -->
+            <line x1="38" y1="72" x2="38" y2="92" stroke="rgba(224,231,255,0.85)" stroke-width="3" stroke-linecap="round" stroke-dasharray="3,3"/>
+            <line x1="62" y1="72" x2="62" y2="92" stroke="rgba(224,231,255,0.85)" stroke-width="3" stroke-linecap="round" stroke-dasharray="3,3"/>
+            <!-- Jet fuselage and wings -->
+            <path d="M50 4 C46 4 43 8 43 18 L43 38 L10 56 C7 58 7 62 10 62 L43 54 L43 75 L31 84 C29 85 29 88 32 88 L46 86 L50 96 L54 86 L68 88 C71 88 71 85 69 84 L57 75 L57 54 L90 62 C93 62 93 58 90 56 L57 38 L57 18 C57 8 54 4 50 4 Z" fill="#ffffff" stroke="#312e81" stroke-width="2.5" stroke-linejoin="round"/>
+            <!-- Cockpit window -->
+            <path d="M47 15 C47 12 50 10 50 10 C50 10 53 12 53 15 Z" fill="#4338ca"/>
+            <!-- Jet turbines -->
+            <rect x="33" y="45" width="7" height="16" rx="3.5" fill="#e0e7ff" stroke="#312e81" stroke-width="1.5"/>
+            <rect x="60" y="45" width="7" height="16" rx="3.5" fill="#e0e7ff" stroke="#312e81" stroke-width="1.5"/>
+            <!-- Port / Starboard navigation lights -->
+            <circle cx="10" cy="59" r="2.5" fill="#ef4444"/>
+            <circle cx="90" cy="59" r="2.5" fill="#22c55e"/>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
   }), [heading]);
-
-  const position = useMemo(() => {
-    if (!stops || stops.length < 2) return null;
-    const from = stops[0];
-    const to = stops[stops.length - 1];
-    // Linear interpolation (great-circle approximation)
-    const lat = from.lat + (to.lat - from.lat) * progress;
-    const lng = from.lng + (to.lng - from.lng) * progress;
-    return [lat, lng];
-  }, [stops, progress]);
 
   if (!position) return null;
 
@@ -98,11 +166,17 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
     return [fromCity || 'Delhi', ...dest];
   }, [fromCity, destinations]);
 
+  const flightArcCoords = useMemo(() => {
+    if (!isIntercontinental || stops.length < 2) return null;
+    return getGreatCircleArc(stops[0], stops[stops.length - 1], 90);
+  }, [isIntercontinental, stops]);
+
   const boundsCoords = useMemo(() => {
+    if (isIntercontinental && flightArcCoords?.length) return flightArcCoords;
     if (routeInfo?.polylineCoords?.length) return routeInfo.polylineCoords;
     if (stops.length > 0) return stops.map(s => [s.lat, s.lng]);
     return [];
-  }, [routeInfo, stops]);
+  }, [isIntercontinental, flightArcCoords, routeInfo, stops]);
 
   useEffect(() => {
     const key = `${cities.join(',')}_${fromDate || ''}_${toDate || ''}`;
@@ -389,15 +463,35 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
             crossOrigin="anonymous"
           />
 
-          {/* Route polyline or great-circle dashed path */}
-          {routeInfo?.polylineCoords?.length > 0 && (
-            <Polyline 
-              positions={routeInfo.polylineCoords} 
-              color={isIntercontinental ? '#6366f1' : '#121619'} 
-              weight={isIntercontinental ? 3 : 4} 
-              opacity={0.7} 
-              dashArray="10,10" 
-            />
+          {/* Route polyline or great-circle curved flight path */}
+          {isIntercontinental && flightArcCoords?.length > 0 ? (
+            <>
+              {/* Soft ambient flight glow */}
+              <Polyline 
+                positions={flightArcCoords} 
+                color="#6366f1" 
+                weight={8} 
+                opacity={0.2} 
+              />
+              {/* Electric indigo dashed flight path */}
+              <Polyline 
+                positions={flightArcCoords} 
+                color="#4f46e5" 
+                weight={3} 
+                opacity={0.85} 
+                dashArray="8, 10" 
+              />
+            </>
+          ) : (
+            routeInfo?.polylineCoords?.length > 0 && (
+              <Polyline 
+                positions={routeInfo.polylineCoords} 
+                color="#121619" 
+                weight={4} 
+                opacity={0.85} 
+                dashArray="8,8" 
+              />
+            )
           )}
           {/* Animated plane for intercontinental routes */}
           {isIntercontinental && stops.length >= 2 && (
