@@ -1257,9 +1257,16 @@ app.post(['/api/planner/dsa/buses/search', '/api/dsa/buses/search'], async (req,
 
 // ---- 3. DSA HOTEL SEARCH ----
 app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (req, res) => {
-  const { city, checkIn, checkOut, rooms = 1, adults = 2, nights = 1 } = req.body;
+  const { city, checkIn, checkOut, rooms = 1, adults = 2, nights = 1, isInternational = false, countryCode } = req.body;
   let rawResults = [];
   let traceId = null;
+
+  // For international trips, RequestType = "International" fetches from DSA's international hotel DB
+  const requestType = isInternational ? 'International' : 'Domestic';
+  // Use provided countryCode, or default to IN for domestic
+  const hotelCountryCode = countryCode || (isInternational ? null : 'IN');
+
+  console.log(`[hotel-search] City: ${city}, RequestType: ${requestType}, CountryCode: ${hotelCountryCode}`);
 
   // Resolve ALL matching cityIds for this city name (some cities like Bangalore/Chennai have 2+ entries)
   function resolveAllHotelCityIds(cityName) {
@@ -1280,13 +1287,15 @@ app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (re
   }
 
   const cityIds = resolveAllHotelCityIds(city);
-  console.log(`[hotel-search] City: ${city}, Found cityIds: ${cityIds.join(', ')}`);
+  // For international trips with no city code match, try with CityId=0 (DSA resolves via city name)
+  const idsToSearch = cityIds.length > 0 ? cityIds : (isInternational ? ['0'] : []);
+  console.log(`[hotel-search] CityIds: ${idsToSearch.join(', ') || 'none'}`);
 
   // Try each cityId until one returns results (not 998/900)
-  for (const cityId of cityIds) {
+  for (const cityId of idsToSearch) {
     if (rawResults.length > 0) break;
     try {
-      const dsaRes = await axios.post(`${process.env.PLANNER_DSA_HOTEL_BASE_URL || process.env.DSA_HOTEL_BASE_URL}/rest/Search`, {
+      const searchBody = {
         EndUserIp: process.env.PLANNER_DSA_HOTEL_END_USER_IP || process.env.DSA_HOTEL_END_USER_IP,
         ClientId: process.env.PLANNER_DSA_HOTEL_CLIENT_ID || process.env.DSA_HOTEL_CLIENT_ID,
         UserName: process.env.PLANNER_DSA_HOTEL_USERNAME || process.env.DSA_HOTEL_USERNAME,
@@ -1295,7 +1304,6 @@ app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (re
         CheckOutDate: checkOut,
         NoOfNights: String(nights),
         BookingMode: '5',
-        CountryCode: 'IN',
         CityId: cityId,
         ResultCount: '50',
         PreferredCurrency: 'INR',
@@ -1307,7 +1315,12 @@ app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (re
         MinRating: '0',
         ReviewScore: null,
         IsNearBySearchAllowed: false,
-      }, { timeout: 12000, headers: { 'Api-Token': process.env.PLANNER_DSA_HOTEL_API_TOKEN || process.env.DSA_HOTEL_API_TOKEN } });
+        RequestType: requestType,
+      };
+      // Only add CountryCode for domestic (international omits it so DSA uses its own mapping)
+      if (hotelCountryCode) searchBody.CountryCode = hotelCountryCode;
+
+      const dsaRes = await axios.post(`${process.env.PLANNER_DSA_HOTEL_BASE_URL || process.env.DSA_HOTEL_BASE_URL}/rest/Search`, searchBody, { timeout: 12000, headers: { 'Api-Token': process.env.PLANNER_DSA_HOTEL_API_TOKEN || process.env.DSA_HOTEL_API_TOKEN } });
 
       const dsaError = dsaRes.data?.Error;
       const errCode = dsaError?.ErrorCode;
