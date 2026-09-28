@@ -1379,7 +1379,8 @@ app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (re
           headers: {
             'X-Goog-Api-Key': key,
             'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.photos',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Referer': 'https://packurbag.in/'
           },
           timeout: 5000
         }
@@ -1393,6 +1394,7 @@ app.post(['/api/planner/dsa/hotels/search', '/api/dsa/hotels/search'], async (re
           return {
             id: p.id,
             property_name: p.displayName?.text || 'Hotel',
+            name: p.displayName?.text || 'Hotel',
             address: p.formattedAddress,
             hotel_stars: p.rating ? Math.round(p.rating) : 4,
             price_per_night_inr: 5000 + Math.floor(Math.random() * 5000), // Mock price since Places API doesn't return prices
@@ -1631,7 +1633,8 @@ app.post(['/api/planner/dsa/hotels/along-route', '/api/dsa/hotels/along-route'],
             headers: {
               'X-Goog-Api-Key': key,
               'X-Goog-FieldMask': 'places.id,places.displayName,places.rating,places.userRatingCount,places.formattedAddress,places.location,places.photos',
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Referer': 'https://packurbag.in/'
             },
             timeout: 5000
           }
