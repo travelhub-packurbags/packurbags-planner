@@ -425,6 +425,17 @@ export default function StepTransport({
 
           {loadingOut && outboundMode !== 'bike' ? (
             <SkeletonCards />
+          ) : isForeignTrip && outboundMode !== 'flight' ? (
+            <div className="py-12 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-white border border-gray-100 shadow-sm rounded-full flex items-center justify-center text-gray-400 text-3xl mb-4">
+                <FontAwesomeIcon icon={faGlobe} />
+              </div>
+              <h4 className="text-gray-900 font-bold text-lg mb-1">Not available for international trips</h4>
+              <p className="text-gray-500 text-sm max-w-sm mb-6">Bus and Self Drive options are currently unsupported for cross-country routes. Please switch to Flight mode.</p>
+              <button onClick={() => setOutboundMode('flight')} className="px-6 py-2.5 bg-[#121619] hover:bg-[#1e2429] text-[#D4B15A] rounded-xl text-sm font-bold shadow-md hover:scale-105 transition-all">
+                Switch to Flight
+              </button>
+            </div>
           ) : (
             <div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -488,6 +499,17 @@ export default function StepTransport({
 
           {loadingRet && returnMode !== 'bike' ? (
             <SkeletonCards />
+          ) : isForeignTrip && returnMode !== 'flight' ? (
+            <div className="py-12 bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-white border border-gray-100 shadow-sm rounded-full flex items-center justify-center text-gray-400 text-3xl mb-4">
+                <FontAwesomeIcon icon={faGlobe} />
+              </div>
+              <h4 className="text-gray-900 font-bold text-lg mb-1">Not available for international trips</h4>
+              <p className="text-gray-500 text-sm max-w-sm mb-6">Bus and Self Drive options are currently unsupported for cross-country routes. Please switch to Flight mode.</p>
+              <button onClick={() => setReturnMode('flight')} className="px-6 py-2.5 bg-[#121619] hover:bg-[#1e2429] text-[#D4B15A] rounded-xl text-sm font-bold shadow-md hover:scale-105 transition-all">
+                Switch to Flight
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {returnOptions.map(opt => (

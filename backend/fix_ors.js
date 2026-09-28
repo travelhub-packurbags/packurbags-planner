@@ -1,0 +1,1 @@
+const fs = require('fs'); const file = 'server.js'; let content = fs.readFileSync(file, 'utf8'); content = content.replace(/url\.searchParams\.set\('text', t\.includes\('India'\) \? t : .*?\);/g, url.searchParams.set('text', t);); fs.writeFileSync(file, content);

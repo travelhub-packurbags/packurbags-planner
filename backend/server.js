@@ -370,9 +370,9 @@ app.get('/api/planner/ors/geocode', async (req, res) => {
     const url = new URL(`${ORS_BASE}/geocode/search`);
     url.searchParams.set('api_key', key);
     const t = text.trim();
-    url.searchParams.set('text', t.includes('India') ? t : `${t}, India`);
+    url.searchParams.set('text', t);
     url.searchParams.set('size', '1');
-    url.searchParams.set('boundary.country', 'IND');
+    
     if (type === 'city') url.searchParams.set('layers', 'locality,region');
     const response = await axios.get(url.toString(), { timeout: 8000 });
     res.json(response.data);
