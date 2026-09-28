@@ -5,6 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { geocodeCity } from '../../services/places';
+import { geocodeCityORS } from '../../services/orsPlaces';
 import { getRoute } from '../../services/routing';
 import { toast } from 'react-toastify';
 
@@ -206,7 +207,8 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
       // 1. Geocode stops
       const geocoded = [];
       for (const city of currentCities) {
-        const c = await geocodeCity(city);
+        let c = await geocodeCityORS(city);
+        if (!c) c = await geocodeCity(city);
         if (c) geocoded.push({ name: city, lat: c.lat, lng: c.lng });
       }
       setStops(geocoded);
