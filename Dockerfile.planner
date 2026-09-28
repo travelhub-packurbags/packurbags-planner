@@ -1,4 +1,4 @@
-﻿FROM node:22-alpine
+FROM node:22-alpine
 WORKDIR /app
 
 COPY backend/package.json backend/package-lock.json* ./
@@ -7,6 +7,7 @@ RUN npm ci --omit=dev
 COPY backend/ .
 COPY city_code.json /city_code.json
 COPY hotel_city_code_special.json /hotel_city_code_special.json
+COPY hotels.json /hotels.json
 
 EXPOSE 5000
 CMD ["node", "server.js"]
