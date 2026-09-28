@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import { searchRestaurants } from '../../services/places';
+import { fetchSerperImage } from '../../services/serper';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faUtensils, 
