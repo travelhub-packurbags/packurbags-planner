@@ -68,7 +68,16 @@ export default function ScheduleTrip() {
     const saved = sessionStorage.getItem('ff_trip_check_result');
     return saved ? JSON.parse(saved) : null;
   });
-  const [isForeignTrip, setIsForeignTrip] = useState(false);
+  const [isForeignTrip, setIsForeignTrip] = useState(() => {
+    const saved = sessionStorage.getItem('ff_trip_check_result');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return !!parsed.isForeignTrip;
+      } catch (e) {}
+    }
+    return false;
+  });
   const { addToast, addDraft } = useAppStore();
 
   const [fromSuggestions, setFromSuggestions] = useState([]);
