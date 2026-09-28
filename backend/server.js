@@ -487,29 +487,6 @@ app.get('/api/planner/static-map', async (req, res) => {
 });
 
 // ============================================================
-// Serper Image Search proxy — GET /api/planner/serper/images?q=<query>
-// Routes through backend so key never appears in the browser bundle.
-// ============================================================
-app.get('/api/planner/serper/images', async (req, res) => {
-  const serperKey = process.env.SERPER_API_KEY;
-  if (!serperKey) return res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: 'Serper API key not configured.' });
-  const q = req.query.q || '';
-  if (!q.trim()) return res.status(400).json({ error: 'q query param required' });
-  try {
-    const response = await axios.post(
-      'https://google.serper.dev/images',
-      { q: q.trim(), num: 5 },
-      { headers: { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' }, timeout: 8000 }
-    );
-    // Return only the images array for simplicity
-    res.json({ images: response.data?.images || [] });
-  } catch (err) {
-    console.error('[/api/planner/serper/images]', err.message);
-    res.status(503).json({ code: 'PLANNER_UNAVAILABLE', message: err.message });
-  }
-});
-
-// ============================================================
 // Google Places Photo proxy — GET /api/planner/places/photo?ref=<photoRef>&maxH=500
 // Fetches the actual image bytes and streams them; key never in browser URL.
 // ============================================================
