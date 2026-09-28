@@ -113,6 +113,16 @@ export default function Step5Dining({
         }));
         setRestaurants(withImages);
         toast.success(`Loaded ${withImages.length} restaurants!`);
+        // Serper Image Enhancement — always fetch for better photos than Google Places
+        googleResults.forEach(async (rest) => {
+          const serperImg = await fetchSerperImage(rest.name, finalCity);
+          if (serperImg) {
+            setRestaurantImages(prev => ({
+              ...prev,
+              [`${rest.name}::${rest.city || finalCity}`]: serperImg
+            }));
+          }
+        });
       } else {
         toast.info("No highly-rated restaurants found via Google. Using dataset.");
       }
@@ -157,6 +167,19 @@ export default function Step5Dining({
         }) : [];
         if (filteredRests.length === 0) filteredRests = (Array.isArray(restData) ? restData : []).slice(0, 30);
         setRestaurants(filteredRests);
+        // Background Serper fetch for restaurant images
+        const cityForSerper = targetCity || destination || 'India';
+        filteredRests.slice(0, 15).forEach(async (rest) => {
+          if (!rest.image || rest.image.includes('unsplash')) {
+            const serperImg = await fetchSerperImage(rest.name, cityForSerper);
+            if (serperImg) {
+              setRestaurantImages(prev => ({
+                ...prev,
+                [`${rest.name}::${rest.city || cityForSerper}`]: serperImg
+              }));
+            }
+          }
+        });
 
       } catch (err) {
         console.error("Failed to load dining dataset:", err);
@@ -271,10 +294,15 @@ export default function Step5Dining({
                   {spotImg && (
                     <div className="mb-3 rounded-xl overflow-hidden h-36 w-full relative">
                       <img
-                        src={spotImg}
+                        src={restaurantImages[`${rest.name}::${rest.city || ''}`] || rest.image || getCuisineImage(rest.food_type)}
                         alt={rest.name}
                         className="w-full h-full object-cover"
-                        onError={(e) => { e.target.style.display = 'none'; }}
+                        onError={(e) => {
+                          // If Google photo fails, fall back to cuisine image
+                          if (e.target.src !== getCuisineImage(rest.food_type)) {
+                            e.target.src = getCuisineImage(rest.food_type);
+                          }
+                        }}
                       />
                       {isSelected && (
                         <span className="absolute top-2 right-2 bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">

@@ -588,6 +588,67 @@ export function fetchGoogleAttractions(cityName) {
   // always gets a cache hit and shares the single in-flight request.
   if (attractionsCache.has(cityName)) return attractionsCache.get(cityName);
 
+  // Known entry fees for famous global attractions (USD approximate, converted at Rs86 per USD)
+  const KNOWN_FEES_INR = {
+    // New York
+    'one world observatory': 3784,
+    'one world trade center': 3784,
+    'top of the rock': 3612,
+    'summit one vanderbilt': 3784,
+    'empire state building': 3870,
+    'statue of liberty': 2150,
+    'tenement museum': 2580,
+    'metropolitan museum': 3440,
+    'met museum': 3440,
+    'american museum of natural history': 2580,
+    'museum of modern art': 2150,
+    'moma': 2150,
+    '9/11 memorial museum': 2840,
+    // London
+    'london eye': 3440,
+    'tower of london': 3098,
+    'madame tussauds london': 4300,
+    'the shard': 3440,
+    'natural history museum london': 0,
+    'british museum': 0,
+    // Paris
+    'eiffel tower': 2408,
+    'louvre museum': 1720,
+    'musée d\'orsay': 1720,
+    'palace of versailles': 2150,
+    'arc de triomphe': 1204,
+    // Dubai
+    'burj khalifa': 4300,
+    'dubai frame': 2580,
+    'img worlds of adventure': 4730,
+    // Singapore
+    'universal studios singapore': 6450,
+    'gardens by the bay': 2150,
+    'marina bay sands skypark': 2580,
+    // Tokyo
+    'tokyo skytree': 3354,
+    'tokyo disneyland': 6020,
+    'teamlab': 3440,
+    // India
+    'taj mahal': 1100,
+    'red fort': 600,
+    'qutub minar': 40,
+    'humayun tomb': 600,
+    'amber fort': 550,
+    'hawa mahal': 200,
+    'mysore palace': 200,
+    'gateway of india': 0,
+    'india gate': 0,
+  };
+
+  const getKnownFee = (name) => {
+    const n = (name || '').toLowerCase().trim();
+    for (const [key, fee] of Object.entries(KNOWN_FEES_INR)) {
+      if (n.includes(key)) return { fee, known: true };
+    }
+    return { fee: null, known: false };
+  };
+
   const p = (async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/v1/planner/places/attractions?city=${encodeURIComponent(cityName)}`);
@@ -604,15 +665,23 @@ export function fetchGoogleAttractions(cityName) {
         type:                 place.primaryType ? place.primaryType.replace(/_/g, ' ') : 'Tourist Hub',
         google_review_rating: place.rating || 4.5,
         entrance_fee_inr:     (() => {
+          // 1. Check known-fees lookup first (most reliable for famous attractions)
+          const knownResult = getKnownFee(place.displayName?.text);
+          if (knownResult.known) return knownResult.fee;
+          // 2. Fall back to Google priceLevel
           const lvl = place.priceLevel;
           if (!lvl || lvl === 'PRICE_LEVEL_FREE') return 0;
-          if (lvl === 'PRICE_LEVEL_INEXPENSIVE') return 200;
-          if (lvl === 'PRICE_LEVEL_MODERATE') return 800;
+          if (lvl === 'PRICE_LEVEL_INEXPENSIVE') return 300;
+          if (lvl === 'PRICE_LEVEL_MODERATE') return 1000;
           if (lvl === 'PRICE_LEVEL_EXPENSIVE') return 2500;
           if (lvl === 'PRICE_LEVEL_VERY_EXPENSIVE') return 5000;
           return 0;
         })(),
-        is_free_entry:        !place.priceLevel || place.priceLevel === 'PRICE_LEVEL_FREE',
+        is_free_entry:        (() => {
+          const knownResult = getKnownFee(place.displayName?.text);
+          if (knownResult.known) return knownResult.fee === 0;
+          return !place.priceLevel || place.priceLevel === 'PRICE_LEVEL_FREE';
+        })(),
         weekly_off:           'None',
         dslr_allowed:         'Yes',
         description:          place.editorialSummary?.text || `A popular tourist attraction in ${cityName}.`,

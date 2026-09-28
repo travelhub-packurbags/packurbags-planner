@@ -104,6 +104,42 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
         note: 'Evening hours bring bustling local stalls, lively vibes, and freshly prepared food.'
       };
     }
+    if (type.includes('observation') || name.includes('observatory') || name.includes('summit') || name.includes('top of')) {
+      return {
+        slot: 'Evening',
+        note: 'Evening visits offer stunning sunset panoramic views and glittering city lights.'
+      };
+    }
+    if (type.includes('square') || name.includes('square') || name.includes('times square') || name.includes('plaza')) {
+      return {
+        slot: 'Evening',
+        note: 'Evening hours bring the most vibrant atmosphere, bright lights, and lively crowd energy.'
+      };
+    }
+    if (type.includes('liberty') || type.includes('statue') || name.includes('liberty') || name.includes('ferry')) {
+      return {
+        slot: 'Morning',
+        note: 'Take an early morning ferry to beat crowds and enjoy the best views before the afternoon rush.'
+      };
+    }
+    if (type.includes('world trade') || name.includes('world trade') || name.includes('memorial') || type.includes('memorial')) {
+      return {
+        slot: 'Morning',
+        note: 'Morning visits are quieter, more reflective, and avoid peak afternoon tourist traffic.'
+      };
+    }
+    if (type.includes('museum') || type.includes('gallery') || name.includes('museum') || name.includes('moma')) {
+      return {
+        slot: 'Afternoon',
+        note: 'Afternoon is ideal for exploring indoor exhibits, galleries, and permanent collections.'
+      };
+    }
+    if (type.includes('garden') || type.includes('park') || name.includes('park') || name.includes('garden') || name.includes('central park')) {
+      return {
+        slot: 'Morning',
+        note: 'Morning walks offer a peaceful, uncrowded experience with fresh air and natural light.'
+      };
+    }
     return {
       slot: 'Morning',
       note: 'Morning hours are ideal for a pleasant visit.'
@@ -244,7 +280,23 @@ export default function Step2SchedulePlaces({ selectedPlaces, scheduleData, onUp
                       <span>📍 {place.city ? `${place.city}, ${place.state || place.city}` : 'Destination'}</span>
                       <span>•</span>
                       <span className="bg-gray-100 text-gray-700 font-semibold px-2 py-0.5 rounded-md">
-                        Approx {place.time_needed_to_visit_hrs || 5} hrs visit
+                        Approx {(() => {
+                          if (place.time_needed_to_visit_hrs && place.time_needed_to_visit_hrs !== 5) return place.time_needed_to_visit_hrs;
+                          const type = (place.type || place.primaryType || '').toLowerCase();
+                          const name = (place.name || '').toLowerCase();
+                          if (type.includes('observation') || name.includes('observatory') || name.includes('summit')) return 2;
+                          if (type.includes('museum') || type.includes('gallery') || name.includes('museum')) return 3;
+                          if (type.includes('park') || name.includes('park') || name.includes('garden')) return 2;
+                          if (type.includes('statue') || type.includes('monument') || name.includes('statue') || name.includes('memorial')) return 2;
+                          if (type.includes('market') || type.includes('bazaar') || name.includes('market') || name.includes('square')) return 1.5;
+                          if (type.includes('fort') || name.includes('fort') || name.includes('castle')) return 2.5;
+                          if (type.includes('temple') || type.includes('church') || type.includes('mosque') || type.includes('religious')) return 1;
+                          if (type.includes('beach') || name.includes('beach')) return 2;
+                          if (type.includes('zoo') || type.includes('aquarium')) return 3;
+                          if (type.includes('amusement') || name.includes('amusement')) return 4;
+                          if (type.includes('historical') || type.includes('heritage') || name.includes('world trade')) return 2;
+                          return 2;
+                        })()} hrs visit
                       </span>
                       {(Number(place.entrance_fee_inr || place.entryFee || place.fee || 0) > 0) && (
                         <>

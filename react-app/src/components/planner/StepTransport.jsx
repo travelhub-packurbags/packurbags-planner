@@ -338,11 +338,17 @@ export default function StepTransport({
     : returnMode === 'flight' ? dsaFlightsRet.length > 0
     : dsaBusesRet.length > 0;
 
-  const ModeTab = ({ mode, current, onChange, icon, label }) => (
+  const ModeTab = ({ mode, current, onChange, icon, label, disabled = false }) => (
     <button
-      onClick={() => onChange(mode)}
-      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-        current === mode ? 'bg-[#121619] text-[#D4B15A] shadow-md' : 'text-gray-600 hover:text-gray-900'
+      onClick={() => !disabled && onChange(mode)}
+      disabled={disabled}
+      title={disabled ? 'Not available for international trips' : undefined}
+      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+        disabled
+          ? 'opacity-40 cursor-not-allowed line-through text-gray-400'
+          : current === mode
+            ? 'bg-[#121619] text-[#D4B15A] shadow-md cursor-pointer'
+            : 'text-gray-600 hover:text-gray-900 cursor-pointer'
       }`}
     >
       {icon} {label}
@@ -407,8 +413,8 @@ export default function StepTransport({
               <LiveSignalBadge isLive={outboundIsLive} loading={loadingOut} />
               <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
                 <ModeTab mode="flight" current={outboundMode} onChange={setOutboundMode} icon={<FontAwesomeIcon icon={faPlane} />} label="Flight" />
-                {!isForeignTrip && <ModeTab mode="bus"  current={outboundMode} onChange={setOutboundMode} icon={<FontAwesomeIcon icon={faBus} />} label="Bus" />}
-                {!isForeignTrip && <ModeTab mode="bike" current={outboundMode} onChange={setOutboundMode} icon="🚗" label="Self Drive" />}
+                <ModeTab mode="bus"  current={outboundMode} onChange={setOutboundMode} icon={<FontAwesomeIcon icon={faBus} />} label="Bus" disabled={isForeignTrip} />
+                <ModeTab mode="bike" current={outboundMode} onChange={setOutboundMode} icon="🚗" label="Self Drive" disabled={isForeignTrip} />
               </div>
             </div>
           </div>
@@ -470,8 +476,8 @@ export default function StepTransport({
               <LiveSignalBadge isLive={returnIsLive} loading={loadingRet} />
               <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
                 <ModeTab mode="flight" current={returnMode} onChange={setReturnMode} icon={<FontAwesomeIcon icon={faPlane} />} label="Flight" />
-                {!isForeignTrip && <ModeTab mode="bus"  current={returnMode} onChange={setReturnMode} icon={<FontAwesomeIcon icon={faBus} />} label="Bus" />}
-                {!isForeignTrip && <ModeTab mode="bike" current={returnMode} onChange={setReturnMode} icon="🚗" label="Self Drive" />}
+                <ModeTab mode="bus"  current={returnMode} onChange={setReturnMode} icon={<FontAwesomeIcon icon={faBus} />} label="Bus" disabled={isForeignTrip} />
+                <ModeTab mode="bike" current={returnMode} onChange={setReturnMode} icon="🚗" label="Self Drive" disabled={isForeignTrip} />
               </div>
             </div>
           </div>
