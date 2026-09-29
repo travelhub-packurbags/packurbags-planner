@@ -43,48 +43,63 @@ export default function TripPDFDocument({ plan }) {
   const selectedCafes = plan.selectedCafes || plan.wizardData?.selectedCafes || [];
   const selectedPlaces = plan.selectedPlaces || plan.wizardData?.selectedPlaces || [];
 
-  // Normalized Hotels (Fallback to auto-generated hotel or standard hotel if none selected)
-  const displayHotels = selectedHotels.length > 0 ? selectedHotels : [
-    {
-      id: 'h1',
-      property_name: 'The Taj Mahal Palace',
-      address: 'Apollo Bunder, Gateway of India, Mumbai',
-      hotel_stars: 5,
-      rating: '5.0',
-      price_per_night_inr: 12500,
-      facilities: ['Deluxe Room', 'Free Breakfast', 'Free Wi-Fi', 'Swimming Pool'],
-      image: FALLBACK_HOTEL_IMAGES[0],
-      tag: 'BEST AI MATCH',
-    },
-    {
-      id: 'h2',
-      property_name: 'Trident Nariman Point',
-      address: 'Nariman Point, Marine Drive, Mumbai',
-      hotel_stars: 4.7,
-      rating: '4.7',
-      price_per_night_inr: 10200,
-      facilities: ['Free Wi-Fi', 'Breakfast', 'Sea View'],
-      image: FALLBACK_HOTEL_IMAGES[1],
-      tag: 'POPULAR CHOICE',
+  // Normalized Hotels (Use user selected hotels, or extract unique hotels from the generated day plans)
+  const extractedHotels = [];
+  const seenHotelNames = new Set();
+  daysList.forEach((d, idx) => {
+    if (d.hotel && d.hotel.name && d.hotel.name !== 'null' && d.hotel.name !== 'N/A') {
+      const hName = d.hotel.name.trim();
+      if (!seenHotelNames.has(hName.toLowerCase())) {
+        seenHotelNames.add(hName.toLowerCase());
+        extractedHotels.push({
+          id: d.hotel.hotel_id || `extracted_h_${idx}`,
+          property_name: d.hotel.name,
+          name: d.hotel.name,
+          address: d.hotel.address || `${d.city || 'Destination'}`,
+          hotel_stars: d.hotel.rating || 4,
+          rating: typeof d.hotel.rating === 'number' ? `${d.hotel.rating}.0` : (d.hotel.rating || '4.5'),
+          price_per_night_inr: d.hotel.price_per_night_inr || d.hotel.price || 3500,
+          facilities: ['Free Wi-Fi', 'Room Service', 'Air Conditioning', 'Breakfast Available'],
+          image: FALLBACK_HOTEL_IMAGES[extractedHotels.length % FALLBACK_HOTEL_IMAGES.length],
+          tag: extractedHotels.length === 0 ? 'BEST AI MATCH' : 'POPULAR CHOICE',
+        });
+      }
     }
-  ];
+  });
 
-  // Normalized Dining (Fallback if none selected)
-  const displayDining = [...selectedRestaurants, ...selectedCafes].length > 0 
-    ? [...selectedRestaurants, ...selectedCafes]
-    : [
-        {
-          id: 'd1',
-          name: 'Tandoor Hut',
-          address: 'Koramangala, Bangalore',
-          cuisine: 'North Indian • Mughlai • BBQ',
-          timeSlot: '7:00 PM',
-          price: 650,
-          image: FALLBACK_DINING_IMAGES[0],
-        }
-      ];
+  const displayHotels = selectedHotels.length > 0 ? selectedHotels : extractedHotels;
 
-  const primaryHotelName = displayHotels[0]?.property_name || displayHotels[0]?.name || 'The Taj Mahal Palace';
+  // Normalized Dining (Use user selected dining, or extract curated meals from the daily schedule)
+  const userSelectedDining = [...selectedRestaurants, ...selectedCafes];
+  const extractedDining = [];
+  const seenDiningNames = new Set();
+  daysList.forEach((d, dIdx) => {
+    (d.schedule || []).forEach((act, aIdx) => {
+      const isMeal = act.type === 'meal' || act.type === 'dining' || 
+                     act.title?.toLowerCase().includes('restaurant') || 
+                     act.title?.toLowerCase().includes('cafe') || 
+                     act.title?.toLowerCase().includes('dhaba');
+      const dName = (act.place || act.title || '').trim();
+      if (isMeal && dName && !seenDiningNames.has(dName.toLowerCase()) && 
+          !dName.toLowerCase().includes('midway') && !dName.toLowerCase().includes('motel restaurant')) {
+        seenDiningNames.add(dName.toLowerCase());
+        extractedDining.push({
+          id: `extracted_d_${dIdx}_${aIdx}`,
+          name: dName,
+          address: `${d.city || 'Destination'}`,
+          cuisine: act.activity || 'Local Cuisine & Regional Specialties',
+          timeSlot: act.time ? `${act.time}` : (aIdx === 1 ? 'Lunch (01:30 PM)' : 'Dinner (07:30 PM)'),
+          price: act.cost_inr || 500,
+          image: FALLBACK_DINING_IMAGES[extractedDining.length % FALLBACK_DINING_IMAGES.length],
+        });
+      }
+    });
+  });
+
+  const displayDining = userSelectedDining.length > 0 ? userSelectedDining : extractedDining.slice(0, 3);
+  const isDiningUserReserved = userSelectedDining.length > 0;
+
+  const primaryHotelName = displayHotels[0]?.property_name || displayHotels[0]?.name || (daysList[0]?.hotel?.name) || 'City Center Hotel';
 
   return (
     <div className="w-full max-w-5xl mx-auto font-sans text-gray-900 bg-white select-text cursor-text">
@@ -400,161 +415,165 @@ export default function TripPDFDocument({ plan }) {
       </div>
 
       {/* ── 3. Recommended Hotels & Accommodations (Image 4) ── */}
-      <div className="mb-12 break-inside-avoid">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🏨</span>
-            <h3 className="text-2xl font-black text-gray-900 font-display">
-              Recommended Hotels &amp; Accommodations
-            </h3>
+      {displayHotels.length > 0 && (
+        <div className="mb-12 break-inside-avoid">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🏨</span>
+              <h3 className="text-2xl font-black text-gray-900 font-display">
+                Recommended Hotels &amp; Accommodations
+              </h3>
+            </div>
+            <button className="text-xs font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3.5 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer">
+              <span>Change Hotel Selection</span>
+              <span>🔄</span>
+            </button>
           </div>
-          <button className="text-xs font-bold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3.5 py-1.5 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer">
-            <span>Change Hotel Selection</span>
-            <span>🔄</span>
-          </button>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {displayHotels.map((h, i) => {
-            const hImg = h.image || (h.images && h.images[0]) || FALLBACK_HOTEL_IMAGES[i % FALLBACK_HOTEL_IMAGES.length];
-            const price = h.price_per_night_inr || h.price_inr || 12500;
-            const tag = h.tag || (i === 0 ? 'BEST AI MATCH' : 'POPULAR CHOICE');
-            const rating = h.rating || (h.hotel_stars ? `${h.hotel_stars}.0` : '5.0');
-            const inclusions = h.facilities || ['Deluxe Room', 'Free Breakfast', 'Free Wi-Fi', 'Swimming Pool'];
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {displayHotels.map((h, i) => {
+              const hImg = h.image || (h.images && h.images[0]) || FALLBACK_HOTEL_IMAGES[i % FALLBACK_HOTEL_IMAGES.length];
+              const price = h.price_per_night_inr || h.price_inr || 3500;
+              const tag = h.tag || (i === 0 ? 'BEST AI MATCH' : 'POPULAR CHOICE');
+              const rating = h.rating || (h.hotel_stars ? `${h.hotel_stars}.0` : '4.5');
+              const inclusions = h.facilities || ['Deluxe Room', 'Free Breakfast', 'Free Wi-Fi', 'Room Service'];
 
-            return (
-              <div 
-                key={h.id || i}
-                className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-              >
-                <div>
-                  <div className="h-44 sm:h-52 relative overflow-hidden bg-gray-100">
-                    <img 
-                      src={hImg} 
-                      alt={h.property_name || h.name} 
-                      className="w-full h-full object-cover"
-                      onError={(e) => { e.target.src = FALLBACK_HOTEL_IMAGES[0]; }}
-                    />
-                    <div className="absolute top-3.5 left-3.5">
-                      <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider shadow-sm text-white ${
-                        tag === 'BEST AI MATCH' ? 'bg-[#f97316]' : 'bg-sky-600'
-                      }`}>
-                        {tag}
-                      </span>
-                    </div>
-                    <div className="absolute top-3.5 right-3.5">
-                      <span className="bg-black/65 backdrop-blur-md text-amber-400 text-xs font-extrabold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
-                        <FontAwesomeIcon icon={faStar} className="text-amber-400 text-[11px]" />
-                        <span>{rating}</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-5">
-                    <h4 className="font-extrabold text-gray-900 text-lg leading-tight line-clamp-1">
-                      {h.property_name || h.name}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 line-clamp-1">
-                      <span>📍</span> <span>{h.address || h.city}</span>
-                    </p>
-
-                    <div className="flex flex-wrap items-center gap-2 mt-3.5">
-                      {inclusions.slice(0, 4).map((inc, incIdx) => (
-                        <span 
-                          key={incIdx} 
-                          className="bg-gray-50 border border-gray-200 text-gray-700 text-[11px] font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1"
-                        >
-                          <FontAwesomeIcon icon={faCheck} className="text-emerald-500 text-[10px]" />
-                          <span>{inc}</span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-5 pt-0 flex items-center justify-between border-t border-gray-100 mt-2">
+              return (
+                <div 
+                  key={h.id || i}
+                  className="bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                >
                   <div>
-                    <span className="text-lg font-black text-gray-900 block leading-tight">
+                    <div className="h-44 sm:h-52 relative overflow-hidden bg-gray-100">
+                      <img 
+                        src={hImg} 
+                        alt={h.property_name || h.name} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => { e.target.src = FALLBACK_HOTEL_IMAGES[0]; }}
+                      />
+                      <div className="absolute top-3.5 left-3.5">
+                        <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase tracking-wider shadow-sm text-white ${
+                          tag === 'BEST AI MATCH' ? 'bg-[#f97316]' : 'bg-sky-600'
+                        }`}>
+                          {tag}
+                        </span>
+                      </div>
+                      <div className="absolute top-3.5 right-3.5">
+                        <span className="bg-black/65 backdrop-blur-md text-amber-400 text-xs font-extrabold px-2.5 py-1 rounded-lg flex items-center gap-1 shadow-sm">
+                          <FontAwesomeIcon icon={faStar} className="text-amber-400 text-[11px]" />
+                          <span>{rating}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-5">
+                      <h4 className="font-extrabold text-gray-900 text-lg leading-tight line-clamp-1">
+                        {h.property_name || h.name}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 line-clamp-1">
+                        <span>📍</span> <span>{h.address || h.city || 'City Center'}</span>
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-2 mt-3.5">
+                        {inclusions.slice(0, 4).map((inc, incIdx) => (
+                          <span 
+                            key={incIdx} 
+                            className="bg-gray-50 border border-gray-200 text-gray-700 text-[11px] font-semibold px-2.5 py-1 rounded-lg flex items-center gap-1"
+                          >
+                            <FontAwesomeIcon icon={faCheck} className="text-emerald-500 text-[10px]" />
+                            <span>{inc}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 pt-0 flex items-center justify-between border-t border-gray-100 mt-2">
+                    <div>
+                      <span className="text-lg font-black text-gray-900 block leading-tight">
+                        ₹{price.toLocaleString('en-IN')}
+                      </span>
+                      <span className="text-[10px] text-gray-400 block mt-0.5 font-medium">per night • Incl. taxes</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button className="bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1">
+                        <FontAwesomeIcon icon={faCheck} />
+                        <span>Booked</span>
+                      </button>
+                      <button className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
+                        <span>View Details</span>
+                      </button>
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. Dining Experience (Image 4) ── */}
+      {displayDining.length > 0 && (
+        <div className="mb-8 break-inside-avoid">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🍴</span>
+              <h3 className="text-2xl font-black text-gray-900 font-display">
+                {isDiningUserReserved ? `Reserved Dining Experience (${displayDining.length})` : `Curated Dining Experience (${displayDining.length})`}
+              </h3>
+            </div>
+            <button className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-1.5 rounded-xl transition-colors cursor-pointer">
+              Change Dining
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {displayDining.map((rest, rIdx) => {
+              const rImg = rest.image || FALLBACK_DINING_IMAGES[rIdx % FALLBACK_DINING_IMAGES.length];
+              const timeSlot = rest.timeSlot || (rIdx === 0 ? 'Lunch (01:30 PM)' : 'Dinner (07:30 PM)');
+              const price = rest.price || rest.rate_for_two || 500;
+
+              return (
+                <div 
+                  key={rest.id || rIdx}
+                  className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                >
+                  <div className="flex items-center gap-4 min-w-0">
+                    <img 
+                      src={rImg} 
+                      alt={rest.name} 
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shrink-0 border border-gray-200 shadow-2xs"
+                      onError={(e) => { e.target.src = FALLBACK_DINING_IMAGES[0]; }}
+                    />
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-black uppercase text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-md inline-block mb-1.5">
+                        TIME: {timeSlot}
+                      </span>
+                      <h4 className="font-extrabold text-gray-900 text-lg leading-snug line-clamp-1">
+                        {rest.name}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 line-clamp-1">
+                        <span>📍</span> <span>{rest.address || 'Destination'} • {rest.cuisine || 'Regional Cuisine'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-left sm:text-right shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
+                    <span className="text-xl font-black text-gray-900 block">
                       ₹{price.toLocaleString('en-IN')}
                     </span>
-                    <span className="text-[10px] text-gray-400 block mt-0.5 font-medium">per night • Incl. taxes</span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button className="bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-bold px-4 py-2 rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1">
-                      <FontAwesomeIcon icon={faCheck} />
-                      <span>Booked</span>
-                    </button>
-                    <button className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-xl transition-all cursor-pointer">
-                      <span>View Details</span>
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── 4. Reserved Dining Experience (Image 4) ── */}
-      <div className="mb-8 break-inside-avoid">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🍴</span>
-            <h3 className="text-2xl font-black text-gray-900 font-display">
-              Reserved Dining Experience ({displayDining.length})
-            </h3>
-          </div>
-          <button className="text-xs font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-3.5 py-1.5 rounded-xl transition-colors cursor-pointer">
-            Change Dining
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          {displayDining.map((rest, rIdx) => {
-            const rImg = rest.image || FALLBACK_DINING_IMAGES[rIdx % FALLBACK_DINING_IMAGES.length];
-            const timeSlot = rest.timeSlot || '7:00 PM';
-            const price = rest.price || rest.rate_for_two || 650;
-
-            return (
-              <div 
-                key={rest.id || rIdx}
-                className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-4 min-w-0">
-                  <img 
-                    src={rImg} 
-                    alt={rest.name} 
-                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover shrink-0 border border-gray-200 shadow-2xs"
-                    onError={(e) => { e.target.src = FALLBACK_DINING_IMAGES[0]; }}
-                  />
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-black uppercase text-orange-700 bg-orange-50 border border-orange-200 px-2.5 py-0.5 rounded-md inline-block mb-1.5">
-                      TIME: {timeSlot}
+                    <span className="text-xs text-emerald-600 font-extrabold block mt-0.5">
+                      {isDiningUserReserved ? '✓ Reserved Table' : '★ Curated Selection'}
                     </span>
-                    <h4 className="font-extrabold text-gray-900 text-lg leading-snug line-clamp-1">
-                      {rest.name}
-                    </h4>
-                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1 line-clamp-1">
-                      <span>📍</span> <span>{rest.address || 'Koramangala, Bangalore'} • {rest.cuisine || 'North Indian • Mughlai • BBQ'}</span>
-                    </p>
                   </div>
                 </div>
-
-                <div className="text-left sm:text-right shrink-0 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-gray-100">
-                  <span className="text-xl font-black text-gray-900 block">
-                    ₹{price.toLocaleString('en-IN')}
-                  </span>
-                  <span className="text-xs text-emerald-600 font-extrabold block mt-0.5">
-                    ✓ Reserved Table
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── 5. Official PDF Footer Branding ── */}
       <div className="pt-6 border-t border-gray-200 text-center text-xs text-gray-400">

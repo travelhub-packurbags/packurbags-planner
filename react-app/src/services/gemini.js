@@ -160,6 +160,82 @@ const CITY_FALLBACK_DB = {
       { name: "Vinayak Family Restaurant", rate: 500, cuisine: "Assagao; Authentic Goan prawn thali & fried fish" }
     ]
   },
+  mumbai: {
+    spots: [
+      { name: "Gateway of India & Apollo Bunder", fee: 0, dslr: "Yes", activity: "Iconic 1924 basalt arch monument overlooking Mumbai Harbour & Taj Mahal Palace" },
+      { name: "Marine Drive & Queen's Necklace", fee: 0, dslr: "Yes", activity: "3.6 km seaside promenade, panoramic Arabian Sea sunset & Art Deco buildings" },
+      { name: "Elephanta Caves UNESCO World Heritage Site", fee: 260, dslr: "Yes", activity: "Ferry from Gateway of India to 5th-century rock-cut Trimurti Shiva sculpture" },
+      { name: "Chhatrapati Shivaji Maharaj Terminus (CSMT)", fee: 0, dslr: "Yes", activity: "Victorian Gothic UNESCO architectural masterpiece and historical railway museum" },
+      { name: "Siddhivinayak Temple", fee: 0, dslr: "No", activity: "Historic Lord Ganesha shrine in Prabhadevi with ornate gold-plated sanctum" },
+      { name: "Bandra Bandstand & Sea Link Viewpoint", fee: 0, dslr: "Yes", activity: "Walk of the Stars, Arabian Sea breeze, and panorama of the cable-stayed Sea Link" },
+      { name: "Colaba Causeway Heritage Market", fee: 0, dslr: "Yes", activity: "Bustling cultural street shopping for vintage curios, handicrafts & local cafes" },
+      { name: "Juhu Beach & Chowpatty Street Food", fee: 0, dslr: "Yes", activity: "Famous beach walk, sunset stalls with authentic Pav Bhaji and Bhelpuri" },
+      { name: "Haji Ali Dargah", fee: 0, dslr: "Yes", activity: "15th-century Indo-Islamic shrine connected by an offshore causeway in Worli Bay" },
+      { name: "Sanjay Gandhi National Park & Kanheri Caves", fee: 85, dslr: "Yes", activity: "Protected evergreen forest and 109 ancient Buddhist rock-cut caves" }
+    ],
+    hotels: [
+      { name: "The Taj Mahal Palace", price: 14500, rating: 4.9, address: "Apollo Bunder, Colaba, Mumbai" },
+      { name: "Trident Nariman Point", price: 10500, rating: 4.8, address: "Nariman Point, Marine Drive, Mumbai" },
+      { name: "Hotel Suba Palace", price: 4800, rating: 4.4, address: "Near Gateway of India, Colaba, Mumbai" },
+      { name: "The Gordon House Hotel", price: 6200, rating: 4.5, address: "Battery Street, Colaba, Mumbai" },
+      { name: "Residency Hotel Fort", price: 3800, rating: 4.3, address: "Fort Heritage District, Mumbai" }
+    ],
+    dining: [
+      { name: "Leopold Cafe & Bar", rate: 1200, cuisine: "Colaba; Iconic heritage cafe since 1871, cold beer & continental snacks" },
+      { name: "Cafe Mondegar (Mondy's)", rate: 900, cuisine: "Colaba; Mario Miranda murals, retro jukebox & draught beer" },
+      { name: "Trishna Restaurant", rate: 2200, cuisine: "Fort; Legendary butter garlic crab & coastal Mangalorean seafood" },
+      { name: "Britannia & Co. Restaurant", rate: 1100, cuisine: "Ballard Estate; Authentic Parsi Berry Pulao & Caramel Custard" },
+      { name: "Bademiya", rate: 700, cuisine: "Tulloch Road, Colaba; Late night tandoori chicken, baida roti & seekh kebabs" },
+      { name: "Kyani & Co. Bakery & Irani Cafe", rate: 400, cuisine: "Marine Lines; Bun Maska, Irani Chai, Kheema Pav & mawa cakes" }
+    ]
+  },
+  vishakhapatnam: {
+    spots: [
+      { name: "RK Beach (Ramakrishna Beach)", fee: 0, dslr: "Yes", activity: "3 km shoreline promenade, coastal breeze & beach parks" },
+      { name: "INS Kurusura Submarine Museum", fee: 40, dslr: "Yes", activity: "Soviet-era decommissioned submarine interior tour on RK Beach" },
+      { name: "Kailasagiri Hilltop Park", fee: 40, dslr: "Yes", activity: "Giant Shiva-Parvati statues, ropeway cable car & panoramic Bay of Bengal views" },
+      { name: "Araku Valley & Coffee Plantations", fee: 0, dslr: "Yes", activity: "Eastern Ghats valley, aromatic coffee estates & tribal museum (115 km)" },
+      { name: "Borra Caves", fee: 65, dslr: "Yes", activity: "150-million-year-old limestone stalactite and stalagmite formations" },
+      { name: "Rishikonda Beach & Water Sports", fee: 0, dslr: "Yes", activity: "Blue Flag-certified beach with jet skiing, surfing & parasailing" },
+      { name: "Simhachalam Temple", fee: 0, dslr: "No", activity: "11th-century hilltop temple dedicated to Lord Varaha Narasimha" },
+      { name: "Yarada Beach", fee: 0, dslr: "Yes", activity: "Enclosed golden-sand beach surrounded by lush green hills" }
+    ],
+    hotels: [
+      { name: "Novotel Visakhapatnam Varun Beach", price: 8500, rating: 4.7, address: "Beach Road, Visakhapatnam" },
+      { name: "Taj Gateway Hotel Visakhapatnam", price: 10500, rating: 4.8, address: "Beach Road, RK Beach, Visakhapatnam" },
+      { name: "Fortune Inn Sree Kanya", price: 5500, rating: 4.4, address: "Dwaraka Nagar, Visakhapatnam" },
+      { name: "Haritha Vihar Beach Resort", price: 3500, rating: 4.1, address: "Rushikonda Beach, Visakhapatnam" },
+      { name: "Hotel Daspalla Visakhapatnam", price: 2800, rating: 4.2, address: "Suryabagh, Visakhapatnam" }
+    ],
+    dining: [
+      { name: "The Square at Novotel", rate: 1800, cuisine: "Beach Road; Luxury international buffet & Andhra seafood" },
+      { name: "Dhaba City Punjab", rate: 850, cuisine: "Waltair Uplands; Authentic North Indian curries & tandoor" },
+      { name: "Ming Garden (Taj)", rate: 2200, cuisine: "Beach Road; Authentic Sichuan & Cantonese cuisine" },
+      { name: "Sea Inn (Raju Gari Dhaba)", rate: 700, cuisine: "Rushikonda; Famous spicy Andhra prawn curry & chicken fry" }
+    ]
+  },
+  delhi: {
+    spots: [
+      { name: "Red Fort (Lal Qila)", fee: 50, dslr: "Yes", activity: "17th-century Mughal imperial palace fortress & Diwan-i-Khas" },
+      { name: "Qutub Minar & Mehrauli Complex", fee: 50, dslr: "Yes", activity: "73m UNESCO victory tower and 4th-century rust-resistant Iron Pillar" },
+      { name: "Humayun's Tomb", fee: 50, dslr: "Yes", activity: "Mughal garden tomb architecture prototype of the Taj Mahal" },
+      { name: "India Gate & Kartavya Path", fee: 0, dslr: "Yes", activity: "War memorial arch, lawns, Amar Jawan Jyoti & evening illumination" },
+      { name: "Lotus Temple (Bahá'í House of Worship)", fee: 0, dslr: "Yes", activity: "Flower-shaped marble architectural marvel and silent meditation sanctuary" },
+      { name: "Akshardham Temple", fee: 0, dslr: "No", activity: "Grand sandstone temple complex, musical fountain & cultural boat ride" },
+      { name: "Chandni Chowk & Jama Masjid", fee: 0, dslr: "Yes", activity: "Old Delhi heritage food walk, spice market & India's largest mosque" }
+    ],
+    hotels: [
+      { name: "The Imperial New Delhi", price: 13500, rating: 4.9, address: "Janpath, Connaught Place, New Delhi" },
+      { name: "The Lalit New Delhi", price: 8500, rating: 4.7, address: "Barakhamba Road, Connaught Place, New Delhi" },
+      { name: "Bloomrooms @ Janpath", price: 3800, rating: 4.4, address: "Janpath Lane, New Delhi" }
+    ],
+    dining: [
+      { name: "Karim's Historic Mughlai", rate: 800, cuisine: "Gali Kababian, Jama Masjid; Mutton Korma & Seekh Kebabs since 1913" },
+      { name: "Bukhara (ITC Maurya)", rate: 4500, cuisine: "Diplomatic Enclave; World-renowned Dal Bukhara & Sikandari Raan" },
+      { name: "Gulati Restaurant", rate: 1200, cuisine: "Pandara Road Market; Legendary Butter Chicken & Kakori Kebabs" },
+      { name: "Paranthe Wali Gali", rate: 350, cuisine: "Chandni Chowk; Deep-fried heritage parathas with sweet rabri" }
+    ]
+  },
   manali: {
     spots: [
       { name: "Hadimba Devi Temple", fee: 50, dslr: "Yes", activity: "1553 CE pagoda wooden shrine inside Dhungri cedar forest" },
@@ -198,6 +274,44 @@ const CITY_FALLBACK_DB = {
       { name: "LMB (Laxmi Misthan Bhandar)", rate: 700, note: "Johari Bazaar; Iconic Rajasthani Dal Baati Churma" },
       { name: "Tapri Central Rooftop Cafe", rate: 500, note: "C-Scheme; Rooftop Kulhad Chai & fusion snacks" },
       { name: "Chokhi Dhani Ethnic Resort", rate: 1800, note: "Tonk Road; Royal Rajasthani thali & folk dance show" }
+    ]
+  },
+  agra: {
+    spots: [
+      { name: "Taj Mahal (UNESCO World Heritage)", fee: 250, dslr: "Yes", activity: "17th-century white marble mausoleum built by Mughal Emperor Shah Jahan" },
+      { name: "Agra Fort (Red Fort of Agra)", fee: 50, dslr: "Yes", activity: "Massive 16th-century Mughal red sandstone imperial citadel & palaces" },
+      { name: "Fatehpur Sikri Royal Complex", fee: 50, dslr: "Yes", activity: "Emperor Akbar's fortified ancient capital & Buland Darwaza" },
+      { name: "Mehtab Bagh Sunset Garden", fee: 25, dslr: "Yes", activity: "Charbagh complex across Yamuna river with pristine views of the Taj Mahal" },
+      { name: "Tomb of I'timad-ud-Daulah (Baby Taj)", fee: 30, dslr: "Yes", activity: "Exquisite marble inlay and pietra dura predecessor to the Taj Mahal" }
+    ],
+    hotels: [
+      { name: "ITC Mughal, A Luxury Collection Hotel", price: 9500, rating: 4.8, address: "Fatehabad Road, Agra" },
+      { name: "Tajview, Agra - IHCL SeleQtions", price: 7200, rating: 4.7, address: "Fatehabad Road, Tajganj, Agra" },
+      { name: "Hotel Sidhartha", price: 2200, rating: 4.2, address: "Near Western Gate, Taj Mahal, Agra" }
+    ],
+    dining: [
+      { name: "Pinch of Spice", rate: 1200, cuisine: "Fatehabad Road; Famous North Indian Murg Boti Masala & Dal Makhani" },
+      { name: "Dasaprakash", rate: 700, cuisine: "Meher Cinema Complex; Authentic South Indian thali & dosas" },
+      { name: "Petha Junction & Street Delicacies", rate: 300, cuisine: "Kinari Bazaar; Authentic Agra Angoori Petha & Bedmi Puri" }
+    ]
+  },
+  bangalore: {
+    spots: [
+      { name: "Lalbagh Botanical Garden & Glass House", fee: 25, dslr: "Yes", activity: "240-acre century-old botanical sanctuary with rare tropical flora & glass pavilion" },
+      { name: "Bangalore Palace", fee: 250, dslr: "Yes", activity: "19th-century Tudor-style royal palace with fortified towers and woodcarvings" },
+      { name: "Cubbon Park & Vidhana Soudha", fee: 0, dslr: "Yes", activity: "Lush city park promenade viewing Karnataka's grand neo-Dravidian legislature" },
+      { name: "Bannerghatta Biological Park & Safari", fee: 350, dslr: "Yes", activity: "Lion, tiger and bear safari plus butterfly conservatory in suburban hills" },
+      { name: "Tipu Sultan's Summer Palace", fee: 20, dslr: "Yes", activity: "18th-century teakwood Indo-Islamic palace with ornate carved pillars" }
+    ],
+    hotels: [
+      { name: "The Leela Palace Bengaluru", price: 14500, rating: 4.9, address: "Old Airport Road, Bangalore" },
+      { name: "Taj West End Bengaluru", price: 12000, rating: 4.8, address: "Race Course Road, Bangalore" },
+      { name: "Bloomrooms @ Indiranagar", price: 3600, rating: 4.4, address: "100 Feet Road, Indiranagar, Bangalore" }
+    ],
+    dining: [
+      { name: "MTR (Mavalli Tiffin Room)", rate: 450, cuisine: "Lalbagh Road; Iconic Rava Idli, Masala Dosa & filter coffee since 1924" },
+      { name: "Vidyarthi Bhavan", rate: 350, cuisine: "Gandhi Bazaar, Basavanagudi; Legendary crispy butter masala dosas since 1943" },
+      { name: "Toit Brewpub", rate: 1600, cuisine: "Indiranagar; Craft microbrewery beers and wood-fired gourmet pizzas" }
     ]
   }
 };
@@ -255,11 +369,47 @@ async function generateFallbackTripPlan(config) {
 
   // Final fallback to hardcoded DB if requested city not found in local datasets
   if (spots.length === 0) {
-    const dbKey = Object.keys(CITY_FALLBACK_DB).find(k => destKey.includes(k)) || 'goa';
-    const cityData = CITY_FALLBACK_DB[dbKey];
-    spots = cityData.spots;
-    hotels = cityData.hotels;
-    dining = cityData.dining;
+    let matchKey = Object.keys(CITY_FALLBACK_DB).find(k => destKey.includes(k) || k.includes(destKey));
+    if (!matchKey) {
+      if (/gateway|marine drive|colaba|bandra|juhu|elephanta|mumbai|bombay/i.test(destKey)) matchKey = 'mumbai';
+      else if (/india gate|red fort|qutub|chandni|delhi|new delhi/i.test(destKey)) matchKey = 'delhi';
+      else if (/taj mahal|agra/i.test(destKey)) matchKey = 'agra';
+      else if (/charminar|golconda|hyderabad/i.test(destKey)) matchKey = 'hyderabad';
+      else if (/araku|borra|vizag|vishakhapatnam|visakhapatnam/i.test(destKey)) matchKey = 'vishakhapatnam';
+      else if (/lalbagh|cubbon|bangalore|bengaluru/i.test(destKey)) matchKey = 'bangalore';
+      else if (/amer fort|hawa mahal|jaipur/i.test(destKey)) matchKey = 'jaipur';
+      else if (/hadimba|solang|manali/i.test(destKey)) matchKey = 'manali';
+    }
+
+    if (matchKey && CITY_FALLBACK_DB[matchKey]) {
+      const cityData = CITY_FALLBACK_DB[matchKey];
+      spots = cityData.spots;
+      hotels = cityData.hotels;
+      dining = cityData.dining;
+    } else {
+      // Dynamic fallback tailored specifically to the requested destination
+      spots = [
+        { name: `${destCity} Heritage Landmark & Old Quarter`, fee: 100, dslr: "Yes", activity: `Explore historic architectural highlights and cultural heritage in ${destCity}` },
+        { name: `${destCity} Central Promenade & Scenic Viewpoint`, fee: 50, dslr: "Yes", activity: `Scenic viewpoints and panoramic city vistas across ${destCity}` },
+        { name: `${destCity} Famous Artisan Bazaar`, fee: 0, dslr: "Yes", activity: `Artisan crafts, regional textiles, and authentic street shopping in ${destCity}` },
+        { name: `${destCity} Botanical Park & Nature Sanctuary`, fee: 40, dslr: "Yes", activity: `Tranquil nature walks and botanical landscapes in ${destCity}` },
+        { name: `${destCity} Cultural Arts & History Museum`, fee: 150, dslr: "Yes", activity: `Exhibits showcasing regional traditions, history, and fine arts` },
+        { name: `${destCity} Sunset Waterfront & Lake Walk`, fee: 0, dslr: "Yes", activity: `Relaxing sunset stroll along the prime waterfront of ${destCity}` },
+        { name: `${destCity} Ancient Temple & Spiritual Sanctuary`, fee: 0, dslr: "No", activity: `Spiritual and traditional sanctuary exploration in ${destCity}` },
+        { name: `${destCity} Craft Village & Culinary Street`, fee: 0, dslr: "Yes", activity: `Taste authentic local dishes and meet regional artisans in ${destCity}` }
+      ];
+      hotels = [
+        { name: `Grand ${destCity} Palace Hotel`, price: 6500, rating: 4.6, address: `Central Promenade, ${destCity}` },
+        { name: `${destCity} Heritage Residency`, price: 4200, rating: 4.4, address: `Old City Road, ${destCity}` },
+        { name: `${destCity} Comfort Inn & Suites`, price: 2800, rating: 4.2, address: `Station Road, ${destCity}` }
+      ];
+      dining = [
+        { name: `${destCity} Royal Dining Hall`, rate: 800, cuisine: `Authentic regional thali & traditional dishes of ${destCity}` },
+        { name: `${destCity} Spice Garden Restaurant`, rate: 650, cuisine: `Fresh local flavors, tandoor specials & regional favorites` },
+        { name: `Central Heritage Cafe`, rate: 450, cuisine: `Artisanal beverages, specialty snacks & regional sweets` },
+        { name: `Grand Gateway Bistro`, rate: 900, cuisine: `Multi-cuisine casual dining with signature chef specialties` }
+      ];
+    }
   }
 
   const formattedSpots = spots.map(s => ({
