@@ -867,8 +867,21 @@ INSTRUCTION: Use one of these real hotels for the destination stay days. Copy th
   // Scheduled Dining (Cafes & Restaurants) — use safe fallbacks for missing day/timeSlot
   if (selectedCafes.length > 0 || selectedRestaurants.length > 0) {
     const cafesText = selectedCafes.map(c => `* Cafe: ${c.name} (Assigned: ${c.day || 'Any Day'} ${c.timeSlot || 'Lunch'}, Rate for two: ₹${c.rate_for_two || c.price || 500}) [USER_SELECTED]`).join('\n');
-    const restText  = selectedRestaurants.map(r => `* Restaurant: ${r.name} (Assigned: ${r.day || 'Any Day'} ${r.timeSlot || 'Dinner'}, Price for two: ₹${r.price || r.rate_for_two || 500}) [USER_SELECTED]`).join('\n');
-    userMessage += `\n\n- CUSTOMER_SELECTED_DINING (marked [USER_SELECTED]):\n${cafesText}\n${restText}`;
+    // Filter out restaurants from wrong cities to prevent cross-city contamination
+    const destCitiesLower = locations.map(l => l.toLowerCase().trim());
+    const validRests = selectedRestaurants.filter(r => {
+      if (!r.city) return true; // no city field = allow (AI will handle placement)
+      const rCity = (r.city || '').toLowerCase();
+      return destCitiesLower.some(dc => rCity.includes(dc) || dc.includes(rCity));
+    });
+    const wrongCityRests = selectedRestaurants.filter(r => {
+      if (!r.city) return false;
+      const rCity = (r.city || '').toLowerCase();
+      return !destCitiesLower.some(dc => rCity.includes(dc) || dc.includes(rCity));
+    });
+    const restText = validRests.map(r => `* Restaurant: ${r.name} (Assigned: ${r.day || 'Any Day'} ${r.timeSlot || 'Dinner'}, Price for two: \u20b9${r.price || r.rate_for_two || 500}) [USER_SELECTED]`).join('\n');
+    const wrongCityNote = wrongCityRests.length > 0 ? `\nEXCLUDED (wrong city, do NOT use in itinerary): ${wrongCityRests.map(r => r.name + ' in ' + r.city).join(', ')}` : '';
+    userMessage += `\n\n- CUSTOMER_SELECTED_DINING (marked [USER_SELECTED]):\n${cafesText}\n${restText}${wrongCityNote}`;
     userMessage += `\n\nCRITICAL INSTRUCTION: Place these [USER_SELECTED] restaurants and cafes into the itinerary. Mark them with "source": "user" in the schedule JSON. If no specific day is given, distribute them across destination days at appropriate meal times. For ALL OTHER meal slots NOT covered by [USER_SELECTED] items: You MUST use real, named restaurants from the destination city. Do NOT repeat the same restaurant name twice. Do NOT use placeholder names like "Local Heritage Restaurant", "Highway Dhaba", or any generic fictional names. Pick varied, real restaurant names appropriate for the destination city and meal type.`;
   }
 

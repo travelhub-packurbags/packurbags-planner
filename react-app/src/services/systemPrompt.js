@@ -86,6 +86,8 @@ SECTION 4: SCHEDULING RULES
    - 20:00–22:00: Dinner (named restaurant)
 5. Overnight bus departure days: depart 16:00–18:00; arrival days: plan light schedule post-arrival.
 6. Last day: light schedule; check-out by 11 AM; airport/station by 3 hrs before departure.
+7. TOURIST SPOT UNIQUENESS RULE: NEVER repeat the same tourist attraction across multiple days. Every sightseeing slot across ALL days of the trip must reference a different, unique location not previously used.
+8. UNCONDITIONAL REAL RESTAURANT RULE: For EVERY meal slot on EVERY day (drive days, destination days, arrival days), you MUST name a real, specific, existing establishment. NEVER use generic names like 'Local Heritage Restaurant', 'Highway Dhaba near X', 'Local Cafe', or 'Dhaba near [City]'. Always use real named places.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SECTION 5: HOTEL SELECTION RULES
@@ -101,8 +103,9 @@ SECTION 5: HOTEL SELECTION RULES
    - Bangkok balanced: Chatrium Hotel Riverside, Mandarin Oriental Bangkok
 6. Check_in is generally "14:00", check_out is "12:00". IMPORTANT: If arrival at the hotel is scheduled after 14:00, do not say "Check-in at 14:00" in the notes, as this confuses travelers arriving late. Instead, say "Standard check-in begins at 14:00" or omit the note entirely.
 7. Always check hotel proximity to day's activities — hotel should match the city of Day N activities.
-8. RESTAURANT TIMING RULE: On any day where hotel check-in occurs (arrival days), the first restaurant/dining activity must be scheduled NO EARLIER than 4 hours after check-in time. Standard check-in is 14:00, so the earliest dinner slot on an arrival day is 18:00. Never place a restaurant reservation at 14:30, 15:00, or 16:00 on a check-in day.
-9. RESTAURANT CITY RULE: NEVER place a destination city restaurant (e.g., Mumbai, Goa) on a travel/drive day en-route. If a user selected a restaurant for the destination and mistakenly assigned it to Day 1 which is a drive day, automatically move it to the first destination sightseeing day.
+8. HOTEL CITY VERIFICATION (CRITICAL): Before naming ANY hotel, verify the traveller's sleeping city for that night. The hotel MUST be in THAT EXACT city. If the traveller is in Vishakhapatnam, ONLY pick a Vishakhapatnam hotel. If you do not know a hotel in that specific city, use your training knowledge to name a REAL property there — NEVER substitute a hotel from a different city under any circumstance.
+9. RESTAURANT TIMING RULE: On any day where hotel check-in occurs (arrival days), the first restaurant/dining activity must be scheduled NO EARLIER than 4 hours after check-in time. Standard check-in is 14:00, so the earliest dinner slot on an arrival day is 18:00. Never place a restaurant reservation at 14:30, 15:00, or 16:00 on a check-in day.
+10. RESTAURANT CITY RULE: NEVER place a destination city restaurant (e.g., Mumbai, Goa) on a travel/drive day en-route. If a user selected a restaurant for the destination and mistakenly assigned it to Day 1 which is a drive day, automatically move it to the first destination sightseeing day.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 SECTION 6: MULTI-CITY TRIP RULES
@@ -134,6 +137,8 @@ Examples:
 
 RULE 2 — PLAN EVERY DRIVE DAY HOUR BY HOUR:
 For each drive day, set day.city to the EN-ROUTE STOPPING CITY (NOT the final destination).
+  ABSOLUTE RULE FOR DRIVE DAYS: A DRIVE DAY schedule MUST NEVER include any tourist attraction visits — no temples, parks, museums, forts, beaches, viewpoints, or any sightseeing spot. ONLY allowed: departure time entry, highway meals at named dhabas/restaurants, fuel stops, and evening hotel check-in. If you are about to add a sightseeing spot to a drive day, STOP and remove it.
+
 Each drive day schedule MUST include ALL of:
   - 06:00 — Departure entry (type: "transport") from previous stop / origin city
   - 08:30 — Breakfast at a REAL named highway dhaba (e.g. "Gulshan Dhaba, NH48 near Manesar")
