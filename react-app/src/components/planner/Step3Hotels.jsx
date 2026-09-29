@@ -511,14 +511,18 @@ export default function Step3Hotels({
       const localData = await localRes.json();
       let initHotels = [];
       cityList.forEach(city => {
-        const cl = city.toLowerCase();
-        let cityH = localData.filter(h => (h.city||'').toLowerCase().includes(cl) || cl.includes((h.city||'').toLowerCase()));
-        if (!cityH.length) cityH = localData.slice(0, 20);
-        initHotels = initHotels.concat(cityH.slice(0, 30).map(h => ({
-          ...h, routeCity: city,
-          images: h.image ? [h.image, ...FALLBACK_IMAGES_INITIAL.slice(0,2)] : FALLBACK_IMAGES_INITIAL,
-          hotelCategory: h.hotel_category || 'HOTEL', roomType: h.room_type || 'Standard Room',
-        })));
+        const cl = city.toLowerCase().trim();
+        let cityH = localData.filter(h => {
+          const hCity = (h.city || '').toLowerCase();
+          return hCity.includes(cl) || cl.includes(hCity);
+        });
+        if (cityH.length > 0) {
+          initHotels = initHotels.concat(cityH.slice(0, 30).map(h => ({
+            ...h, routeCity: city,
+            images: h.image ? [h.image, ...FALLBACK_IMAGES_INITIAL.slice(0,2)] : FALLBACK_IMAGES_INITIAL,
+            hotelCategory: h.hotel_category || 'HOTEL', roomType: h.room_type || 'Standard Room',
+          })));
+        }
       });
       setHotels(initHotels);
       setDsaSource(false);

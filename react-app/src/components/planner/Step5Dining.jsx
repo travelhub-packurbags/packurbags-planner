@@ -113,16 +113,23 @@ export default function Step5Dining({
         }));
         setRestaurants(withImages);
         toast.success(`Loaded ${withImages.length} restaurants!`);
-        // Serper Image Enhancement — always fetch for better photos than Google Places
-        googleResults.forEach(async (rest) => {
-          const serperImg = await fetchSerperImage(rest.name, finalCity);
-          if (serperImg) {
-            setRestaurantImages(prev => ({
-              ...prev,
-              [`${rest.name}::${rest.city || finalCity}`]: serperImg
-            }));
+        // Serper Image Enhancement - fetch sequentially one-by-one to avoid 429 rate limits
+        (async () => {
+          for (const rest of googleResults.slice(0, 10)) {
+            try {
+              const serperImg = await fetchSerperImage(rest.name, finalCity);
+              if (serperImg) {
+                setRestaurantImages(prev => ({
+                  ...prev,
+                  [`${rest.name}::${rest.city || finalCity}`]: serperImg
+                }));
+              }
+              await new Promise(r => setTimeout(r, 120));
+            } catch (err) {
+              console.warn("[Dining] Serper image fetch error for", rest.name, err);
+            }
           }
-        });
+        })();
       } else {
         toast.info("No highly-rated restaurants found via Google. Using dataset.");
       }
@@ -167,19 +174,27 @@ export default function Step5Dining({
         }) : [];
         if (filteredRests.length === 0) filteredRests = (Array.isArray(restData) ? restData : []).slice(0, 30);
         setRestaurants(filteredRests);
-        // Background Serper fetch for restaurant images
+        // Background Serper fetch - sequentially one by one
         const cityForSerper = targetCity || destination || 'India';
-        filteredRests.slice(0, 15).forEach(async (rest) => {
-          if (!rest.image || rest.image.includes('unsplash')) {
-            const serperImg = await fetchSerperImage(rest.name, cityForSerper);
-            if (serperImg) {
-              setRestaurantImages(prev => ({
-                ...prev,
-                [`${rest.name}::${rest.city || cityForSerper}`]: serperImg
-              }));
+        const toFetch = filteredRests.slice(0, 8);
+        (async () => {
+          for (const rest of toFetch) {
+            if (!rest.image || rest.image.includes('unsplash')) {
+              try {
+                const serperImg = await fetchSerperImage(rest.name, cityForSerper);
+                if (serperImg) {
+                  setRestaurantImages(prev => ({
+                    ...prev,
+                    [`${rest.name}::${rest.city || cityForSerper}`]: serperImg
+                  }));
+                }
+                await new Promise(r => setTimeout(r, 120));
+              } catch (e) {
+                console.warn("[Dining] Dataset image fetch error for", rest.name, e);
+              }
             }
           }
-        });
+        })();
 
       } catch (err) {
         console.error("Failed to load dining dataset:", err);
