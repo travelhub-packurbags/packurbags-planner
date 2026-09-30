@@ -38,41 +38,63 @@ async function searchLocalDataset(query) {
   if (!q) return [];
 
   const results = [];
+  const seenNames = new Set();
 
+  // 1. Try Live OpenStreetMap Nominatim for accurate global city autocomplete
+  try {
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`,
+      { headers: { 'Accept-Language': 'en', 'User-Agent': 'PackUrBag-TravelPlanner/1.0' }, signal: AbortSignal.timeout(3500) }
+    );
+    if (nomRes.ok) {
+      const items = await nomRes.json();
+      items.forEach((it, idx) => {
+        const dName = it.name || it.display_name.split(',')[0].trim();
+        if (!seenNames.has(dName.toLowerCase())) {
+          seenNames.add(dName.toLowerCase());
+          results.push({
+            placeId: `nom_${it.place_id || idx}`,
+            text: it.display_name,
+            displayName: dName,
+            location: { latitude: parseFloat(it.lat), longitude: parseFloat(it.lon) },
+            source: 'nominatim'
+          });
+        }
+      });
+    }
+  } catch (_) {}
+
+  // 2. Exact & partial city matches from local datasets
+  const uniqueCities = new Set();
+  places.forEach(p => { if (p.city) uniqueCities.add(p.city); });
+  hotels.forEach(h => { if (h.city) uniqueCities.add(h.city); });
+  locations.forEach(l => { if (l.title) uniqueCities.add(l.title); });
+
+  uniqueCities.forEach(city => {
+    if (city.toLowerCase().includes(q) && !seenNames.has(city.toLowerCase())) {
+      seenNames.add(city.toLowerCase());
+      results.push({
+        placeId: `city_${city.toLowerCase().replace(/\s+/g, '_')}`,
+        text: `${city}, India`,
+        displayName: city,
+        source: 'local_city'
+      });
+    }
+  });
+
+  // 3. Local attractions & landmarks
   places.forEach(p => {
     if ((p.name && p.name.toLowerCase().includes(q)) || (p.city && p.city.toLowerCase().includes(q))) {
-      results.push({
-        placeId: `local_p_${p.id || p.name}`,
-        text: `${p.name} (${p.city || 'India'})`,
-        displayName: p.name,
-        rawItem: p,
-        source: 'local'
-      });
-    }
-  });
-
-  locations.forEach(l => {
-    if ((l.title && l.title.toLowerCase().includes(q)) || (l.country && l.country.toLowerCase().includes(q))) {
-      results.push({
-        placeId: `local_l_${l.id || l.title}`,
-        text: `${l.title} (${l.country || 'India'})`,
-        displayName: l.title,
-        rawItem: l,
-        source: 'local'
-      });
-    }
-  });
-
-  hotels.forEach(h => {
-    const name = h.property_name || h.name || 'Hotel';
-    if (name.toLowerCase().includes(q) || (h.city && h.city.toLowerCase().includes(q))) {
-      results.push({
-        placeId: `local_h_${h.id || name}`,
-        text: `${name} (${h.city || 'India'})`,
-        displayName: name,
-        rawItem: h,
-        source: 'local'
-      });
+      if (!seenNames.has(p.name.toLowerCase())) {
+        seenNames.add(p.name.toLowerCase());
+        results.push({
+          placeId: `local_p_${p.id || p.name}`,
+          text: `${p.name} (${p.city || 'India'})`,
+          displayName: p.name,
+          rawItem: p,
+          source: 'local'
+        });
+      }
     }
   });
 

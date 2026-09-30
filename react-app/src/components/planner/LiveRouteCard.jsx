@@ -7,6 +7,7 @@ import 'leaflet/dist/leaflet.css';
 import { geocodeCity } from '../../services/places';
 import { geocodeCityORS } from '../../services/orsPlaces';
 import { getRoute } from '../../services/routing';
+import { haversineDistance } from '../../utils/haversine';
 import { toast } from 'react-toastify';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
@@ -213,17 +214,38 @@ export default function LiveRouteCard({ fromCity, destinations, onCaptureSnippet
       }
       setStops(geocoded);
 
-      // Detect intercontinental (lng gap > 30 degrees)
+      // Detect foreign / flight trip (outside India or large geographic span)
+      const isInIndia = (lat, lng) => lat >= 6 && lat <= 38 && lng >= 68 && lng <= 98;
+      let isFlight = false;
       if (geocoded.length >= 2) {
+        const isForeign = geocoded.some(s => !isInIndia(s.lat, s.lng));
         const lngGap = Math.abs(geocoded[geocoded.length - 1].lng - geocoded[0].lng);
-        setIsIntercontinental(lngGap > 30);
+        const latGap = Math.abs(geocoded[geocoded.length - 1].lat - geocoded[0].lat);
+        isFlight = isForeign || lngGap > 18 || latGap > 18;
+        setIsIntercontinental(isFlight);
       }
 
-      // 2. Get driving route
+      // 2. Get route (Flight arc for international, ORS driving route for domestic)
       let route = null;
       if (geocoded.length >= 2) {
-        route = await getRoute(geocoded.map(s => [s.lng, s.lat]));
-        if (route) setRouteInfo(route);
+        if (isFlight) {
+          const fromPt = geocoded[0];
+          const toPt = geocoded[geocoded.length - 1];
+          const distKm = Math.round(haversineDistance(fromPt.lat, fromPt.lng, toPt.lat, toPt.lng));
+          const flightHours = distKm / 750 + 0.75;
+          const fh = Math.floor(flightHours);
+          const fm = Math.round((flightHours - fh) * 60);
+          route = {
+            distanceKm: distKm,
+            durationDisplay: `~${fh}h ${fm}m (Flight)`,
+            fuelCostInr: 0,
+            isFlight: true
+          };
+          setRouteInfo(route);
+        } else {
+          route = await getRoute(geocoded.map(s => [s.lng, s.lat]));
+          if (route) setRouteInfo(route);
+        }
       }
 
       const checkIn = fromDate || new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0];
